@@ -1,9 +1,12 @@
 // local-dev-server.js - Lightweight local HTTP server with Treasury API proxy & static asset delivery
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const url = require('url');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import https from 'node:https';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DEFAULT_PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = __dirname;
@@ -59,11 +62,16 @@ const server = http.createServer(async (req, res) => {
 
   // API Proxy Endpoint for auctions query (Strictly Live Data)
   if (pathname === '/api/treasury/auctions') {
-    const queryString = parsedUrl.search || '?page[size]=1000&filter=original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)&sort=-issue_date';
+    const defaultQuery = '?page[size]=1000&filter=original_security_term:in:(2-Year,3-Year,5-Year,7-Year,10-Year,20-Year,30-Year),security_type:in:(Note,Bond),inflation_index_security:eq:No,floating_rate:eq:No&sort=-auction_date&fields=cusip,security_type,security_term,original_security_term,auction_date,issue_date,maturity_date,record_date,announcemt_date,high_yield,avg_med_yield,low_yield,int_rate,price_per100,bid_to_cover_ratio,offering_amt,total_accepted,comp_accepted,comp_tendered,total_tendered,indirect_bidder_accepted,direct_bidder_accepted,primary_dealer_accepted,noncomp_accepted,soma_accepted,allocation_pctage,reopening,inflation_index_security,floating_rate,pdf_filenm_comp_results,pdf_filenm_announcemt';
+    const queryString = parsedUrl.search || defaultQuery;
     const targetUrl = `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query${queryString}`;
     try {
       const response = await fetchFiscalData(targetUrl);
-      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Data-Source': 'live-api' });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=900, stale-while-revalidate=3600',
+        'X-Data-Source': 'live-api'
+      });
       res.end(response.body);
       return;
     } catch (err) {
@@ -80,7 +88,11 @@ const server = http.createServer(async (req, res) => {
     const targetUrl = `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions${queryString}`;
     try {
       const response = await fetchFiscalData(targetUrl);
-      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Data-Source': 'live-api' });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 's-maxage=900, stale-while-revalidate=3600',
+        'X-Data-Source': 'live-api'
+      });
       res.end(response.body);
       return;
     } catch (err) {

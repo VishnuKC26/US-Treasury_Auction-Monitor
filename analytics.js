@@ -47,13 +47,13 @@ export function parseNum(val) {
 export function getStandardTenor(item) {
   if (!item) return '';
   const term = String(item.original_security_term || item.security_term || '').trim();
-  if (term.startsWith('2-Year')) return '2-Year';
-  if (term.startsWith('3-Year')) return '3-Year';
-  if (term.startsWith('5-Year')) return '5-Year';
-  if (term.startsWith('7-Year')) return '7-Year';
-  if (term.startsWith('10-Year')) return '10-Year';
-  if (term.startsWith('20-Year')) return '20-Year';
-  if (term.startsWith('30-Year')) return '30-Year';
+  if (/\b(30-Year|29-Year)\b/i.test(term)) return '30-Year';
+  if (/\b(20-Year|19-Year)\b/i.test(term)) return '20-Year';
+  if (/\b(10-Year|9-Year)\b/i.test(term)) return '10-Year';
+  if (/\b(7-Year|6-Year)\b/i.test(term)) return '7-Year';
+  if (/\b(5-Year|4-Year)\b/i.test(term)) return '5-Year';
+  if (/\b(3-Year)\b/i.test(term) || (/\b2-Year\b/i.test(term) && /\b(10|11)-Month\b/i.test(term))) return '3-Year';
+  if (/\b(2-Year|1-Year)\b/i.test(term)) return '2-Year';
   return term;
 }
 

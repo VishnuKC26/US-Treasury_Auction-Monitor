@@ -1,94 +1,91 @@
-# U.S. Treasury Bond Auctions Live Intelligence Terminal
+# U.S. Treasury Bond Auctions Intelligence Terminal
 
-A high-performance live dashboard and analytics terminal to monitor, inspect, and analyze results of **2-Year, 5-Year, 10-Year, 20-Year, and 30-Year** U.S. Treasury bond and note auctions.
+A dependency-light, institutional macro terminal to monitor, inspect, and analyze results of benchmark **2-Year, 3-Year, 5-Year, 7-Year, 10-Year, 20-Year, and 30-Year** U.S. Treasury sovereign debt auctions.
 
-Built following the official **[U.S. Treasury Fiscal Data API Quick Guide](https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data)**.
+Designed for analysts and traders to assess auction demand quality and market signals in under 10 seconds. Deployed on Vercel with zero build step, using vanilla ES modules, a vendored Chart.js distribution, and serverless proxies in `api/treasury/`.
 
----
-
-## 🚀 Key Features
-
-- **Live Fiscal Data API Connectivity:** Direct integration with `api.fiscaldata.treasury.gov`, with zero third-party data vendor fees or authentication barriers.
-- **Dedicated Tenor Coverage:** Full tracking for benchmark sovereign debt maturities:
-  - 🟢 **2-Year Treasury Note** (Short-term policy rate expectations)
-  - 🔵 **5-Year Treasury Note** (Medium-term economic outlook)
-  - 🔷 **10-Year Benchmark Note** (Global risk-free benchmark rate)
-  - 🟣 **20-Year Treasury Bond** (Long-end supply absorption)
-  - 🟡 **30-Year Treasury Bond** (Long-term inflation & liability matching)
-- **Institutional Analytics & KPIs:**
-  - **Clearing High Yield & Δ (bps):** Latest cut-off yield vs previous auction change.
-  - **2s10s & Yield Curve Spreads:** Inversion signals, slope steepening/flattening metrics.
-  - **Bid-to-Cover Demand Indicator:** Real-time demand grading (*Strong*, *Normal*, *Soft*).
-  - **Indirect Bidder Appetite:** Foreign central bank and institutional allotment tracking.
-  - **Primary Dealer Absorption / Concession:** Measures supply overhang taken down by dealers of last resort.
-  - **Auction Tail (bps):** Clearing high yield minus median yield (measuring whether an auction stopped through or tailed).
-- **Interactive Visualizations (Chart.js):**
-  - **Yield & Coupon Evolution:** Historical clearing yields and coupons across all 5 tenors.
-  - **Current Yield Curve Snapshot:** Active 2Y-30Y curve with prior auction comparison and spread matrix.
-  - **Bid-to-Cover Ratio & Demand Health:** Bar trend with historical 2.50x benchmark.
-  - **Allotment Distribution Stack:** Visualizing Indirect % vs Direct % vs Primary Dealer %.
-- **Upcoming Auctions Watchlist:** Pulls real-time schedule from `/v1/accounting/od/upcoming_auctions`.
-- **Searchable Results Ledger:** Filter by tenor, issue type (New vs Reopening), date horizon, or search by CUSIP.
-- **Auction Inspector Modal:** Complete telemetry for any selected issue, including competitive vs non-competitive bids, SOMA Fed rollovers, prices, and direct links to official Treasury press releases.
-- **Interactive API Quick Guide:** Built-in modal demonstrating live `curl`, JavaScript `fetch()`, Python `requests`, and query syntax.
-- **CSV Data Export:** One-click export of any filtered dataset.
-- **Theme Switcher:** Dark institutional terminal aesthetic and light theme.
+Powered directly by the official [U.S. Treasury Fiscal Data API](https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data).
 
 ---
 
-## 📡 Fiscal Data API Integration
+## ⚡ Core Institutional Analytics
 
-The application follows the official Fiscal Data REST standards:
-
-### 1. Auctions Results Query
-- **Base Endpoint:**
-  ```http
-  GET https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query
-  ```
-- **Filter for 2, 5, 10, 20, 30 Year Bonds:**
-  ```http
-  ?filter=original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)&sort=-issue_date&page[size]=1000
-  ```
-
-### 2. Upcoming Auctions Feed
-- **Base Endpoint:**
-  ```http
-  GET https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions?page[size]=100
-  ```
-
----
-
-## 💻 Quick Start & Running Locally
-
-### Option 1: Using Node.js (Recommended)
-```bash
-# Clone or navigate to the project directory
-cd bond-auctions
-
-# Start the dev server
-npm start
-# or
-node server.js
-```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
-### Option 2: Standalone Static Opening
-Because the U.S. Treasury API supports **CORS (`Access-Control-Allow-Origin: *`)**, you can also open `index.html` directly in any modern web browser or serve it with any HTTP server (e.g. `python -m http.server 3000`).
+1. **Strict Nominal Coupon Filtering:**
+   - Excludes TIPS (`inflation_index_security: "Yes"`) and FRNs (`floating_rate: "Yes"`), preventing real yields and floating rates from distorting nominal benchmark curves and yield deltas.
+2. **Transparent Demand Grading:**
+   - Evaluates each auction based on trailing 20 auctions of the same tenor:
+     - **STRONG:** Bid-to-cover percentile $\ge$ 67th and Primary Dealer share percentile $\le$ 33rd.
+     - **SOFT:** Bid-to-cover percentile $\le$ 33rd and Primary Dealer share percentile $\ge$ 67th.
+     - **IN LINE:** All other outcomes.
+3. **Accurate Competitive Allotment Shares:**
+   - Divides indirect, direct, and dealer acceptances strictly by `comp_accepted`, guaranteeing shares sum to exactly 100.0%.
+   - Non-competitive awards and Federal Reserve SOMA rollovers are reported separately.
+4. **Stop vs. Median Dispersion (bp):**
+   - Correctly measures cut-off dispersion `(high_yield - avg_med_yield) * 100` alongside `allocation_pctage` ("Allocation at high %").
+5. **Auction-Implied Curve & Spreads:**
+   - Plots the benchmark curve (latest vs. ~1 month prior) across all 7 tenors.
+   - Computes 2s5s, 5s10s, 10s30s, and 2s10s spreads with explicit date disclosures (*auction-implied, dates differ*).
+6. **Live Upcoming Schedule:**
+   - Filters upcoming auctions where `auction_date >= today (America/New_York)`, dedupes by `cusip + auction_date`, sorts ascending, and provides live ET countdowns to 1:00 pm ET (11:30 am for FRN).
 
 ---
 
-## 📂 File Architecture
+## 📂 Architecture
 
 ```
 bond-auctions/
-├── index.html            # Main dashboard interface
-├── styles.css            # Dark financial terminal design system & responsive layout
-├── app.js                # State management, API client, Chart.js integrations & filters
-├── server.js             # Lightweight zero-dependency Node HTTP server with proxy & fallback
-├── package.json          # Node scripts and metadata
+├── index.html            # Main terminal UI & semantic layout
+├── styles.css            # Institutional CSS design system (WCAG AA, responsive)
+├── client.js             # UI orchestrator, lifecycle, and event coordination
+├── analytics.js          # Pure, tested analytics & math functions (no DOM)
+├── analytics.test.js     # Regression & fixture tests (node:test)
+├── data.js               # Resilient data fetching (proxy -> direct -> sample fallback)
+├── state.js              # Central reactive state store
+├── charts.js             # Chart.js rendering & in-place updates (chart.update())
+├── local-dev-server.js   # Local zero-dependency dev server & API proxy
+├── package.json          # Node scripts (start, dev, test)
+├── vercel.json           # Vercel deployment configuration
+├── api/
+│   └── treasury/
+│       ├── auctions.js   # Serverless proxy for auctions_query
+│       └── upcoming.js   # Serverless proxy for upcoming_auctions
 ├── vendor/
-│   └── chart.umd.min.js  # Local offline Chart.js bundle
+│   └── chart.umd.min.js  # Vendored Chart.js bundle
 └── data/
-    ├── sample_auctions.json   # Cached baseline auctions data
-    └── upcoming_auctions.json # Cached baseline upcoming calendar
+    ├── sample_auctions.json   # Cached baseline auctions data (offline fallback)
+    ├── upcoming_auctions.json # Cached baseline upcoming calendar (offline fallback)
+    └── when_issued.json       # Optional when-issued yield data hook
 ```
+
+---
+
+## 🧪 Testing
+
+Run the automated regression and fixture tests with Node's native test runner:
+
+```bash
+npm test
+# or directly:
+node --test
+```
+
+Tests verify:
+- Non-nominal rejection (71 TIPS, 73 FRN correctly excluded).
+- 10Y yield delta regression test (~+46.6 bp vs prior nominal, NOT ~+264.7 bp).
+- Allotment shares sum to 100.0% against verified live October 2026 fixtures (10Y and 30Y).
+- Safe numeric parsing (never converts missing values to 0).
+- Transparent demand quality grading (STRONG, SOFT, IN LINE).
+- Upcoming auction deduplication, New York date filtering, and ascending chronological ordering.
+
+---
+
+## 🚀 Running Locally
+
+```bash
+# Start local server on port 3000
+npm start
+# or
+node local-dev-server.js
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.

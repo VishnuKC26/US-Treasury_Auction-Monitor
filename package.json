@@ -2,7 +2,6 @@
   "name": "treasury-bond-auctions-dashboard",
   "version": "1.0.0",
   "description": "Live US Treasury Securities Bond Auctions Dashboard and Analytics Terminal (2Y, 5Y, 10Y, 20Y, 30Y) powered by Fiscal Data API",
-  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"

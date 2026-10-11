@@ -1,5 +1,3 @@
-const https = require('https');
-
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -11,32 +9,33 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const queryIndex = req.url ? req.url.indexOf('?') : -1;
-  const queryString = queryIndex !== -1 ? req.url.substring(queryIndex) : '?page[size]=1000&filter=original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)&sort=-issue_date';
-  const targetUrl = `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query${queryString}`;
+  try {
+    const parsed = new URL(req.url, 'http://localhost');
+    const targetUrl = new URL('https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query');
 
-  return new Promise((resolve) => {
-    https.get(targetUrl, {
+    if (parsed.search) {
+      targetUrl.search = parsed.search;
+    } else {
+      targetUrl.searchParams.set('page[size]', '1000');
+      targetUrl.searchParams.set('filter', 'original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)');
+      targetUrl.searchParams.set('sort', '-issue_date');
+    }
+
+    const upstream = await fetch(targetUrl.toString(), {
       headers: {
-        'User-Agent': 'TreasuryAuctionsVercel/1.0',
-        'Accept': 'application/json'
-      },
-      timeout: 10000
-    }, (upstreamRes) => {
-      let data = '';
-      upstreamRes.on('data', chunk => data += chunk);
-      upstreamRes.on('end', () => {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('X-Data-Source', 'live-api');
-        res.statusCode = upstreamRes.statusCode || 200;
-        res.end(data);
-        resolve();
-      });
-    }).on('error', (err) => {
-      res.statusCode = 502;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: `Live Treasury API unreachable: ${err.message}` }));
-      resolve();
+        'Accept': 'application/json',
+        'User-Agent': 'TreasuryAuctionsVercel/1.0'
+      }
     });
-  });
+
+    const data = await upstream.text();
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('X-Data-Source', 'live-api');
+    res.statusCode = upstream.status;
+    res.end(data);
+  } catch (err) {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: `Live Treasury API unreachable: ${err.message}` }));
+  }
 };

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>US TREASURY AUCTIONS // SOVEREIGN DEBT TERMINAL</title>
+  <meta name="description" content="Institutional Macro Terminal for US Treasury Securities Bond Auctions (2Y, 5Y, 10Y, 20Y, 30Y) powered by U.S. Treasury Fiscal Data API.">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- LIVE TICKER TAPE MARQUEE -->
+  <div class="ticker-tape-wrap" aria-label="Live Market Marquee">
+    <div class="tape-live-label">
+      <span class="tape-pulse-dot"></span>
+      <span>FISCAL DATA // FEED</span>
+    </div>
+    <div class="ticker-track" id="tickerTrack">
+      <div class="ticker-item"><span class="ticker-tenor">10Y BENCHMARK:</span> <span class="ticker-val num" id="tick10Y">--%</span> <span class="ticker-spread" id="tick10Spread"></span></div>
+      <div class="ticker-item"><span class="ticker-tenor">2Y NOTE:</span> <span class="ticker-val num" id="tick2Y">--%</span></div>
+      <div class="ticker-item"><span class="ticker-tenor">5Y NOTE:</span> <span class="ticker-val num" id="tick5Y">--%</span></div>
+      <div class="ticker-item"><span class="ticker-tenor">20Y BOND:</span> <span class="ticker-val num" id="tick20Y">--%</span></div>
+      <div class="ticker-item"><span class="ticker-tenor">30Y BOND:</span> <span class="ticker-val num" id="tick30Y">--%</span></div>
+      <div class="ticker-item"><span class="ticker-tenor">2s10s SPREAD:</span> <span class="ticker-val num" id="tickSpread">-- bps</span></div>
+      <div class="ticker-item"><span class="ticker-tenor">NEXT AUCTION:</span> <span class="ticker-val" id="tickNext">Connecting to Fiscal Data...</span></div>
+    </div>
+  </div>
+
+  <!-- COMMAND BAR / TERMINAL HEADER -->
+  <header class="command-header">
+    <div class="terminal-brand">
+      <div class="terminal-badge-box">UST</div>
+      <div class="brand-text">
+        <h1>
+          US TREASURY AUCTION INTELLIGENCE
+          <span class="sub-tag" id="statusLiveTag">LIVE REST v1</span>
+        </h1>
+        <div class="brand-meta">
+          <span>Source: <a href="https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data" target="_blank" rel="noopener" class="meta-link">U.S. Department of the Treasury Fiscal Data</a></span>
+          <span>&bull;</span>
+          <span>Coverage: 2Y, 5Y, 10Y, 20Y, 30Y Sovereign Issues</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Clocks -->
+    <div class="terminal-clock-block">
+      <div class="clock-item">
+        <span class="label">NEW YORK (ET)</span>
+        <span class="time num" id="clockET">--:--:-- ET</span>
+      </div>
+      <div class="clock-item">
+        <span class="label">UTC TIME</span>
+        <span class="time num" id="clockUTC">--:--:-- UTC</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="terminal-actions">
+      <button class="t-btn primary" id="btnSync">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Sync Feed
+      </button>
+
+      <button class="t-btn" id="btnApiGuide">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        API Quick Guide
+      </button>
+
+      <button class="t-btn" id="btnExport">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- SUB-NAV / DECK RIBBON -->
+  <nav class="deck-ribbon" aria-label="Terminal Navigation">
+    <div class="deck-tabs" id="deckTabs">
+      <button class="deck-tab active" data-tab="tab-overview">
+        <span class="tab-idx">01</span> OVERVIEW & YIELD CURVE
+      </button>
+      <button class="deck-tab" data-tab="tab-allotment">
+        <span class="tab-idx">02</span> BIDDER ALLOTMENT DYNAMICS
+      </button>
+      <button class="deck-tab" data-tab="tab-upcoming">
+        <span class="tab-idx">03</span> UPCOMING SCHEDULE
+      </button>
+      <button class="deck-tab" data-tab="tab-ledger">
+        <span class="tab-idx">04</span> AUCTION LEDGER & TELEMETRY
+      </button>
+    </div>
+
+    <!-- Quick Global Controls -->
+    <div class="quick-filters">
+      <!-- Period Selector -->
+      <div class="filter-set" id="horizonFilter">
+        <button class="f-pill" data-period="6M">6M</button>
+        <button class="f-pill active" data-period="1Y">1Y</button>
+        <button class="f-pill" data-period="3Y">3Y</button>
+        <button class="f-pill" data-period="5Y">5Y</button>
+        <button class="f-pill" data-period="ALL">ALL</button>
+      </div>
+
+      <!-- Offering Type -->
+      <div class="filter-set" id="offeringFilter">
+        <button class="f-pill active" data-reopen="ALL">ALL ISSUES</button>
+        <button class="f-pill" data-reopen="NEW">NEW</button>
+        <button class="f-pill" data-reopen="REOPEN">REOPEN</button>
+      </div>
+
+      <!-- Instant Search -->
+      <div class="terminal-search">
+        <svg class="search-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="termSearch" placeholder="Filter CUSIP, date, yield..." autocomplete="off">
+      </div>
+    </div>
+  </nav>
+
+  <!-- WORKSPACE GRID -->
+  <main class="workspace-grid">
+
+    <!-- LEFT RAIL: TENOR SPECTRUM & CURVE SLOPE -->
+    <aside class="left-rail">
+      <div class="rail-section-title">
+        <span>Tenor Spectrum</span>
+        <button id="btnTenorAll" style="background:none; border:none; color: var(--neon-cyan); font-family: var(--font-mono); font-size: 9px; cursor: pointer;">SELECT ALL</button>
+      </div>
+
+      <div class="tenor-cards-stack" id="tenorStack">
+        <!-- 2Y -->
+        <button class="tenor-card-btn active" data-tenor="2Y">
+          <div class="tenor-row-top">
+            <span class="tenor-name" style="color: var(--c-2y);">2-YEAR NOTE</span>
+            <span class="tenor-sub-label">POLICY PROXY</span>
+          </div>
+          <div class="tenor-row-stats">
+            <span class="tenor-yield num" id="rail2Yield">--%</span>
+            <span class="tenor-date num" id="rail2Date">--</span>
+          </div>
+        </button>
+
+        <!-- 5Y -->
+        <button class="tenor-card-btn active" data-tenor="5Y">
+          <div class="tenor-row-top">
+            <span class="tenor-name" style="color: var(--c-5y);">5-YEAR NOTE</span>
+            <span class="tenor-sub-label">BELLY OF CURVE</span>
+          </div>
+          <div class="tenor-row-stats">
+            <span class="tenor-yield num" id="rail5Yield">--%</span>
+            <span class="tenor-date num" id="rail5Date">--</span>
+          </div>
+        </button>
+
+        <!-- 10Y Benchmark -->
+        <button class="tenor-card-btn active" data-tenor="10Y">
+          <div class="tenor-row-top">
+            <span class="tenor-name" style="color: var(--c-10y);">10-YEAR BENCHMARK</span>
+            <span class="tenor-sub-label">GLOBAL REFERENCE</span>
+          </div>
+          <div class="tenor-row-stats">
+            <span class="tenor-yield num" id="rail10Yield">--%</span>
+            <span class="tenor-date num" id="rail10Date">--</span>
+          </div>
+        </button>
+
+        <!-- 20Y -->
+        <button class="tenor-card-btn active" data-tenor="20Y">
+          <div class="tenor-row-top">
+            <span class="tenor-name" style="color: var(--c-20y);">20-YEAR BOND</span>
+            <span class="tenor-sub-label">SUPPLY CONCESSION</span>
+          </div>
+          <div class="tenor-row-stats">
+            <span class="tenor-yield num" id="rail20Yield">--%</span>
+            <span class="tenor-date num" id="rail20Date">--</span>
+          </div>
+        </button>
+
+        <!-- 30Y Long Bond -->
+        <button class="tenor-card-btn active" data-tenor="30Y">
+          <div class="tenor-row-top">
+            <span class="tenor-name" style="color: var(--c-30y);">30-YEAR LONG BOND</span>
+            <span class="tenor-sub-label">DURATION & INFL</span>
+          </div>
+          <div class="tenor-row-stats">
+            <span class="tenor-yield num" id="rail30Yield">--%</span>
+            <span class="tenor-date num" id="rail30Date">--</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Curve Slope Meter -->
+      <div class="curve-meter-box">
+        <div class="rail-section-title" style="border:none; padding:0; margin-bottom: 6px;">
+          <span>2s10s Curve Slope</span>
+          <span class="status-steep spread-status-tag" id="curveSlopeTag">STEEPENING</span>
+        </div>
+        <div class="spread-display">
+          <span class="spread-val num" id="rail2s10sVal">-- bps</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--t-secondary);" id="railSpreadDelta">--</span>
+        </div>
+        <div style="font-size: 10px; color: var(--t-muted); font-family: var(--font-mono);">
+          10Y clearing yield minus 2Y clearing yield
+        </div>
+      </div>
+
+      <!-- Quick Demand Gauge -->
+      <div class="curve-meter-box">
+        <div class="rail-section-title" style="border:none; padding:0; margin-bottom: 6px;">
+          <span>Auction Demand Index</span>
+        </div>
+        <div class="spread-display">
+          <span class="spread-val num" id="railBtcAvg">--x</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--neon-cyan);" id="railBtcRating">HEALTHY</span>
+        </div>
+        <div style="font-size: 10px; color: var(--t-muted); font-family: var(--font-mono);">
+          Trailing avg bid-to-cover ratio across active tenors
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER STAGE (MAIN WORKSPACE VIEWS) -->
+    <section class="main-stage">
+
+      <!-- TOP MACRO KPI TICKER STRIP -->
+      <div class="kpi-strip">
+        <div class="kpi-cell kpi-primary">
+          <div class="kpi-label-row">
+            <span>10Y Clearing Cut-off</span>
+            <span id="kpi10DeltaTag" class="num" style="color: var(--neon-cyan);">-- bps</span>
+          </div>
+          <div class="kpi-main-val num" id="kpi10YieldVal">--%</div>
+          <div class="kpi-sub-line">
+            <span id="kpi10AuctionDate">Latest: --</span>
+            <span id="kpi10Coupon">Coupon: --</span>
+          </div>
+        </div>
+
+        <div class="kpi-cell kpi-emerald">
+          <div class="kpi-label-row">
+            <span>Bid-to-Cover Ratio</span>
+            <span id="kpiBtcStatus" style="color: var(--neon-emerald);">STRONG</span>
+          </div>
+          <div class="kpi-main-val num" id="kpiBtcMainVal">--x</div>
+          <div class="kpi-sub-line">
+            <span>Tenders Submitted / Accepted</span>
+            <span>Norm: 2.50x</span>
+          </div>
+        </div>
+
+        <div class="kpi-cell kpi-violet">
+          <div class="kpi-label-row">
+            <span>Indirect (Offshore / Inst)</span>
+            <span id="kpiIndirectAmt" class="num">$0.0B</span>
+          </div>
+          <div class="kpi-main-val num" id="kpiIndirectPct">--%</div>
+          <div class="kpi-sub-line">
+            <span>Foreign Central Banks & Offshore</span>
+            <span>Non-Dealer Allotment</span>
+          </div>
+        </div>
+
+        <div class="kpi-cell kpi-amber">
+          <div class="kpi-label-row">
+            <span>Primary Dealer Absorption</span>
+            <span id="kpiDealerAmt" class="num">$0.0B</span>
+          </div>
+          <div class="kpi-main-val num" id="kpiDealerPct">--%</div>
+          <div class="kpi-sub-line">
+            <span>Dealer of Last Resort Concession</span>
+            <span id="kpiDealerGrade">Low Concession</span>
+          </div>
+        </div>
+
+        <div class="kpi-cell">
+          <div class="kpi-label-row">
+            <span>Period Supply Placed</span>
+            <span id="kpiCountTag" class="num">0 Sales</span>
+          </div>
+          <div class="kpi-main-val num" id="kpiTotalPlaced">$0.0 B</div>
+          <div class="kpi-sub-line">
+            <span id="kpiTenderedTotal">Tendered: $0.0 B</span>
+            <span>US Treasury Direct</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 1: OVERVIEW & YIELD CURVE -->
+      <div class="tab-panel active" id="tab-overview">
+        <div class="deck-dual-col">
+          <!-- Yield History Chart -->
+          <div class="chart-panel-frame">
+            <div class="panel-header-bar">
+              <div class="panel-title-group">
+                <h3 id="yieldChartTitle">AUCTION CLEARING YIELDS & COUPON HISTORICAL EVOLUTION</h3>
+                <div class="panel-subtitle" id="yieldChartSubtitle">Clearing cut-off yield and coupon awards for selected tenors over time</div>
+              </div>
+              <div class="filter-set" id="yieldMetricToggle">
+                <button class="f-pill active" data-metric="high_yield">CLEARING YIELD</button>
+                <button class="f-pill" data-metric="int_rate">COUPON RATE</button>
+                <button class="f-pill" data-metric="tail">AUCTION TAIL (BPS)</button>
+              </div>
+            </div>
+            <div class="chart-stage-box">
+              <canvas id="yieldChart" aria-label="Yield Evolution Chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Yield Curve Snapshot -->
+          <div class="chart-panel-frame">
+            <div class="panel-header-bar">
+              <div class="panel-title-group">
+                <h3>CURRENT TREASURY YIELD CURVE PROFILE</h3>
+                <div class="panel-subtitle">Latest clearing yields across 2Y &rarr; 30Y tenors</div>
+              </div>
+            </div>
+            <div class="chart-stage-box" style="min-height: 220px;">
+              <canvas id="curveChart" aria-label="Yield Curve Chart"></canvas>
+            </div>
+
+            <!-- Tenor Matrix Table below curve -->
+            <div class="tenor-matrix-grid">
+              <div class="t-matrix-cell">
+                <div class="tenor-hdr">2-YEAR</div>
+                <div class="yield-val num" id="mYield2Y">--%</div>
+                <div class="date-val num" id="mDate2Y">--</div>
+              </div>
+              <div class="t-matrix-cell">
+                <div class="tenor-hdr">5-YEAR</div>
+                <div class="yield-val num" id="mYield5Y">--%</div>
+                <div class="date-val num" id="mDate5Y">--</div>
+              </div>
+              <div class="t-matrix-cell">
+                <div class="tenor-hdr">10-YEAR</div>
+                <div class="yield-val num" id="mYield10Y">--%</div>
+                <div class="date-val num" id="mDate10Y">--</div>
+              </div>
+              <div class="t-matrix-cell">
+                <div class="tenor-hdr">20-YEAR</div>
+                <div class="yield-val num" id="mYield20Y">--%</div>
+                <div class="date-val num" id="mDate20Y">--</div>
+              </div>
+              <div class="t-matrix-cell">
+                <div class="tenor-hdr">30-YEAR</div>
+                <div class="yield-val num" id="mYield30Y">--%</div>
+                <div class="date-val num" id="mDate30Y">--</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: BIDDER ALLOTMENT DYNAMICS -->
+      <div class="tab-panel" id="tab-allotment">
+        <div class="deck-dual-col">
+          <div class="chart-panel-frame">
+            <div class="panel-header-bar">
+              <div class="panel-title-group">
+                <h3>BIDDER ALLOTMENT COMPOSITION OVER TIME (%)</h3>
+                <div class="panel-subtitle">Indirect Foreign Central Banks (Purple) vs Direct Domestic Funds (Cyan) vs Primary Dealer Takedown (Amber)</div>
+              </div>
+            </div>
+            <div class="chart-stage-box">
+              <canvas id="allotmentChart" aria-label="Allotment Composition Chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-panel-frame">
+            <div class="panel-header-bar">
+              <div class="panel-title-group">
+                <h3>BID-TO-COVER DEMAND RATIO & CONCESSION</h3>
+                <div class="panel-subtitle">Total tendered bids submitted vs accepted supply</div>
+              </div>
+            </div>
+            <div class="chart-stage-box">
+              <canvas id="btcChart" aria-label="Bid to Cover Ratio Chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: UPCOMING SCHEDULE -->
+      <div class="tab-panel" id="tab-upcoming">
+        <div class="upcoming-board">
+          <div class="panel-header-bar">
+            <div class="panel-title-group">
+              <h3>SCHEDULED TREASURY DEBT AUCTIONS CALENDAR</h3>
+              <div class="panel-subtitle">Live official feed from /v1/accounting/od/upcoming_auctions</div>
+            </div>
+          </div>
+          <div class="upcoming-deck-cards" id="upcomingGrid">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: AUCTION LEDGER & INLINE TELEMETRY -->
+      <div class="tab-panel" id="tab-ledger">
+        <div class="ledger-workbench" id="ledgerWorkbench">
+          <!-- Left Table Frame -->
+          <div class="ledger-frame">
+            <div class="panel-header-bar">
+              <div class="panel-title-group">
+                <h3>MASTER AUCTION RESULTS LEDGER</h3>
+                <div class="panel-subtitle" id="ledgerCountText">Showing auction records</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--t-muted);">PER PAGE:</span>
+                <select id="pageSizeSelect" style="background: var(--bg-deep); border: 1px solid var(--border-dim); color: var(--t-primary); font-family: var(--font-mono); font-size: 10px; padding: 2px 6px; border-radius: 2px;">
+                  <option value="15" selected>15</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ledger-table-wrap">
+              <table class="dense-table" id="auctionTable">
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort="issue_date">ISSUE DATE &#9662;</th>
+                    <th class="sortable" data-sort="original_security_term">TENOR</th>
+                    <th>TYPE</th>
+                    <th>CUSIP</th>
+                    <th class="sortable" data-sort="high_yield">CLEARING YIELD</th>
+                    <th class="sortable" data-sort="int_rate">COUPON</th>
+                    <th>TAIL (BPS)</th>
+                    <th class="sortable" data-sort="bid_to_cover_ratio">BID/COVER</th>
+                    <th class="sortable" data-sort="total_accepted">ACCEPTED ($B)</th>
+                    <th>ALLOTMENT (IND / DIR / DLR)</th>
+                  </tr>
+                </thead>
+                <tbody id="auctionTableBody">
+                  <!-- Populated by app.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Ledger Pagination -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--t-secondary);">
+              <span id="pageInfoDisplay">Page 1 of 1</span>
+              <div style="display: flex; gap: 4px;">
+                <button class="t-btn" id="btnPrevPage" style="padding: 2px 8px;">&lsaquo; PREV</button>
+                <button class="t-btn" id="btnNextPage" style="padding: 2px 8px;">NEXT &rsaquo;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT INLINE TELEMETRY INSPECTOR -->
+          <div class="telemetry-deck" id="telemetryDeck">
+            <div class="telemetry-top-bar">
+              <span class="telemetry-title" id="tDeckTitle">AUCTION TELEMETRY</span>
+              <span class="u-tag tag-new" id="tDeckType">BENCHMARK</span>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-row">
+                <span class="k">CUSIP</span>
+                <span class="v num" id="tDeckCusip">--</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">ISSUE DATE</span>
+                <span class="v num" id="tDeckIssueDate">--</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">MATURITY</span>
+                <span class="v num" id="tDeckMatDate">--</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">SERIES</span>
+                <span class="v num" id="tDeckSeries">--</span>
+              </div>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-row">
+                <span class="k">CLEARING HIGH YIELD</span>
+                <span class="v num" style="color: var(--neon-cyan); font-size: 13px;" id="tDeckHighYield">--%</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">MEDIAN / AVG YIELD</span>
+                <span class="v num" id="tDeckAvgYield">--%</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">AUCTION TAIL</span>
+                <span class="v num" id="tDeckTailBps">-- bps</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">COUPON RATE</span>
+                <span class="v num" id="tDeckCoupon">--%</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">PRICE PER $100</span>
+                <span class="v num" id="tDeckPrice">--</span>
+              </div>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-row">
+                <span class="k">OFFERING TARGET</span>
+                <span class="v num" id="tDeckOffering">$0.00 B</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">TOTAL TENDERED</span>
+                <span class="v num" id="tDeckTendered">$0.00 B</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">TOTAL ACCEPTED</span>
+                <span class="v num" id="tDeckAccepted">$0.00 B</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">BID-TO-COVER</span>
+                <span class="v num" style="color: var(--neon-emerald);" id="tDeckBtc">--x</span>
+              </div>
+              <div class="telemetry-row">
+                <span class="k">SOMA FED ROLLOVER</span>
+                <span class="v num" id="tDeckSoma">$0.00 B</span>
+              </div>
+            </div>
+
+            <!-- Participant Distribution Meter -->
+            <div class="telemetry-card">
+              <span style="font-family: var(--font-mono); font-size: 9px; color: var(--t-muted); text-transform: uppercase;">Allotment Distribution</span>
+              <div class="distribution-bar">
+                <div class="dist-indirect" id="tBarIndirect" style="width: 65%;"></div>
+                <div class="dist-direct" id="tBarDirect" style="width: 20%;"></div>
+                <div class="dist-dealer" id="tBarDealer" style="width: 15%;"></div>
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 9px; display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                <div style="display:flex; justify-content:space-between;">
+                  <span style="color: var(--neon-violet);">&bull; Indirect (Foreign/Inst):</span>
+                  <span id="tPctIndirect" class="num">0.0%</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span style="color: var(--neon-cyan);">&bull; Direct (Domestic Funds):</span>
+                  <span id="tPctDirect" class="num">0.0%</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span style="color: var(--neon-amber);">&bull; Primary Dealers:</span>
+                  <span id="tPctDealer" class="num">0.0%</span>
+                </div>
+              </div>
+            </div>
+
+            <a id="tDeckPdfLink" href="#" target="_blank" rel="noopener" class="t-btn primary" style="text-align: center; justify-content: center; text-decoration: none;">
+              Official Treasury PDF Release
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MODAL: FISCAL DATA API QUICK GUIDE -->
+  <div class="modal-shield" id="apiModalShield">
+    <div class="terminal-dialog">
+      <div class="dialog-hdr">
+        <div style="font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--neon-cyan);">
+          FISCAL DATA API QUICK GUIDE // TREASURY AUCTIONS
+        </div>
+        <button id="btnCloseApiModal" style="background:none; border:none; color: var(--t-muted); font-size: 18px; cursor:pointer;">&times;</button>
+      </div>
+
+      <div class="dialog-body">
+        <p style="font-size: 11px; color: var(--t-secondary); line-height: 1.6;">
+          This terminal connects in real-time to the official RESTful service provided by the <b>U.S. Department of the Treasury (Fiscal Data)</b>. Zero API keys or vendor subscriptions required. Universal CORS is enabled.
+        </p>
+
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--t-muted); margin-bottom: 4px;">PRIMARY ENDPOINT (HISTORICAL & LIVE AUCTION RESULTS)</div>
+          <div class="code-terminal-block">
+            <button class="copy-mini-btn" data-copy="curlCmd">COPY</button>
+            <pre id="curlCmd">curl -g "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[size]=100&filter=original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)&sort=-issue_date"</pre>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--t-muted); margin-bottom: 4px;">UPCOMING AUCTIONS ENDPOINT (SCHEDULED DEBT ANNOUNCEMENTS)</div>
+          <div class="code-terminal-block">
+            <button class="copy-mini-btn" data-copy="curlUpcoming">COPY</button>
+            <pre id="curlUpcoming">curl -g "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions?page[size]=100&sort=-record_date"</pre>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--t-muted); margin-bottom: 4px;">JAVASCRIPT CLIENT QUERY EXAMPLE</div>
+          <div class="code-terminal-block">
+            <button class="copy-mini-btn" data-copy="jsCmd">COPY</button>
+            <pre id="jsCmd">const res = await fetch('https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[size]=100&filter=original_security_term:in:(2-Year,5-Year,10-Year,20-Year,30-Year)&sort=-issue_date');
+const { data } = await res.json();
+console.log('Clearing yield:', data[0].high_yield, 'Bid-to-cover:', data[0].bid_to_cover_ratio);</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

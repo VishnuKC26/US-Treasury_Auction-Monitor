@@ -1,4 +1,4 @@
-// server.js - Lightweight local HTTP server with Treasury API proxy & static asset delivery
+// local-dev-server.js - Lightweight local HTTP server with Treasury API proxy & static asset delivery
 const http = require('http');
 const fs = require('fs');
 const path = require('path');

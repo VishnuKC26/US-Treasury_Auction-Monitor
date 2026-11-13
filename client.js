@@ -1,6 +1,7 @@
 /**
- * client.js - Institutional US Treasury Auction Monitor Terminal
- * Vanilla ES Module orchestrating data loading, pure analytics, Chart.js, and accessible UI.
+ * client.js - Futures First Institutional US Treasury Monitor Terminal
+ * Vanilla ES Module orchestrating data loading, pure analytics, Chart.js,
+ * theme management, responsive tab switching, and the AI Analyst Chatbot.
  */
 
 import { state } from './state.js';
@@ -18,10 +19,11 @@ import {
   calculatePercentileRank
 } from './analytics.js';
 import { loadAuctionsData, loadUpcomingData, loadWhenIssuedData } from './data.js';
-import { renderActiveTakedownChart, renderYieldCurveChart } from './charts.js';
+import { renderActiveTakedownChart, renderYieldCurveChart, updateChartsTheme } from './charts.js';
+import { chatbot } from './chatbot.js';
 
 // =========================================================================
-// FORMATTERS
+// FORMATTERS & UTILITIES
 // =========================================================================
 
 function formatPct(val, decimals = 3) {
@@ -66,11 +68,9 @@ function formatShortDate(dateStr) {
 
 function getCountdownToET(targetDateStr, targetTimeStr = '13:00') {
   if (!targetDateStr) return '—';
-  // Compute target timestamp in America/New_York
   const [tHours, tMins] = targetTimeStr.split(':').map(Number);
   const now = new Date();
   
-  // Format now in NY
   const nyDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now);
   const nyTimeStr = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -95,46 +95,135 @@ function getCountdownToET(targetDateStr, targetTimeStr = '13:00') {
   return `${hours}h ${mins}m`;
 }
 
-// Generate simple inline SVG sparkline
-function renderSparklineSvg(points) {
-  if (!points || points.length < 2) return '';
-  const valid = points.filter(p => p.highYield !== null);
-  if (valid.length < 2) return '';
+// =========================================================================
+// TAB SWITCHING SYSTEM
+// =========================================================================
 
-  const yields = valid.map(p => p.highYield);
-  const min = Math.min(...yields);
-  const max = Math.max(...yields);
-  const range = max - min || 1;
+export function switchTab(tabId) {
+  state.activeTab = tabId;
 
-  const width = 80;
-  const height = 24;
-  const pad = 3;
-
-  const coords = valid.map((p, i) => {
-    const x = pad + (i / (valid.length - 1)) * (width - 2 * pad);
-    const y = height - pad - ((p.highYield - min) / range) * (height - 2 * pad);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  // Update nav buttons
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+    const isTarget = btn.getAttribute('data-tab') === tabId;
+    btn.classList.toggle('is-active', isTarget);
+    btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
   });
 
-  const pathD = `M ${coords.join(' L ')}`;
-  const lastCoord = coords[coords.length - 1].split(',');
+  // Update tab content containers
+  const tabMap = {
+    overview: 'tabOverview',
+    curve: 'tabCurve',
+    demand: 'tabDemand',
+    ledger: 'tabLedger',
+    upcoming: 'tabUpcoming',
+    chat: 'tabChat'
+  };
 
-  return `
-    <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-      <path d="${pathD}" fill="none" stroke="#475569" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${lastCoord[0]}" cy="${lastCoord[1]}" r="2.2" fill="#0f172a" />
-    </svg>
-  `;
+  Object.entries(tabMap).forEach(([key, elementId]) => {
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.classList.toggle('is-active', key === tabId);
+    }
+  });
+
+  // Update topbar heading
+  const headingEl = document.getElementById('pageTitleHeading');
+  if (headingEl) {
+    const titleMap = {
+      overview: 'Executive Overview',
+      curve: 'Yield Curve & Spreads',
+      demand: 'Demand Dynamics & Allotment',
+      ledger: 'Historical Auction Ledger',
+      upcoming: 'Upcoming Issuance Calendar',
+      chat: 'AI Institutional Analyst'
+    };
+    headingEl.textContent = titleMap[tabId] || 'Treasury Monitor';
+  }
+
+  // Refresh charts on tab activation
+  if (tabId === 'overview') {
+    renderYieldCurveChart();
+    renderActiveTakedownChart(state.activeTenor);
+  } else if (tabId === 'curve') {
+    renderYieldCurveChart();
+  } else if (tabId === 'demand') {
+    renderDemandDynamicsTab();
+    renderActiveTakedownChart(state.activeTenor);
+  }
+
+  // Close mobile sidebar if open
+  document.getElementById('workspace-nav')?.classList.remove('mobile-open');
 }
 
 // =========================================================================
-// UI RENDERERS
+// THEME MANAGEMENT (Futures First Light / Dark System)
+// =========================================================================
+
+function initTheme() {
+  let theme = 'light';
+  try {
+    const saved = localStorage.getItem('ff-theme');
+    if (saved === 'light' || saved === 'dark') {
+      theme = saved;
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      theme = 'dark';
+    }
+  } catch (e) {}
+
+  state.theme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeUI();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  state.theme = next;
+  document.documentElement.setAttribute('data-theme', next);
+  try {
+    localStorage.setItem('ff-theme', next);
+  } catch (e) {}
+  updateThemeUI();
+  updateChartsTheme();
+}
+
+function updateThemeUI() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textEl = document.getElementById('themeToggleText');
+  const iconSun = document.getElementById('themeIconSun');
+
+  if (textEl) {
+    textEl.textContent = isDark ? 'Dark Mode' : 'Light Mode';
+  }
+
+  if (iconSun) {
+    if (isDark) {
+      // Moon icon
+      iconSun.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+    } else {
+      // Sun icon
+      iconSun.innerHTML = `
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      `;
+    }
+  }
+}
+
+// =========================================================================
+// HEADER & STATUS RENDERERS
 // =========================================================================
 
 function renderHeaderStatus() {
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
-  const asOfTime = document.getElementById('asOfTime');
   const staleBanner = document.getElementById('staleBanner');
   const errorBanner = document.getElementById('errorBanner');
 
@@ -159,7 +248,7 @@ function renderHeaderStatus() {
   if (statusDot && statusText) {
     if (state.dataSource === 'live-proxy' || state.dataSource === 'live-direct') {
       statusDot.className = 'status-dot live';
-      statusText.textContent = state.dataSource === 'live-proxy' ? 'LIVE PROXY' : 'LIVE REST';
+      statusText.textContent = state.dataSource === 'live-proxy' ? 'LIVE PROXY' : 'LIVE FISCAL';
     } else if (state.dataSource === 'stale-sample') {
       statusDot.className = 'status-dot stale';
       statusText.textContent = 'OFFLINE SAMPLE';
@@ -167,15 +256,6 @@ function renderHeaderStatus() {
       statusDot.className = 'status-dot connecting';
       statusText.textContent = 'CONNECTING';
     }
-  }
-
-  if (asOfTime && state.dataTimestamp) {
-    asOfTime.textContent = state.dataTimestamp.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZoneName: 'short'
-    });
   }
 }
 
@@ -188,7 +268,6 @@ function renderNextAuctionLine() {
     return;
   }
 
-  // Find soonest Note/Bond
   const soonest = state.upcomingAuctions.find(a => ['Note', 'Bond'].includes(a.security_type)) || state.upcomingAuctions[0];
   const isReopen = String(soonest.reopening || '').toLowerCase() === 'yes';
   const issueLabel = isReopen ? 'reopening' : 'new issue';
@@ -197,7 +276,6 @@ function renderNextAuctionLine() {
   const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // Format date e.g. "Wed 21 Oct"
   let dateFormatted = soonest.auction_date;
   if (soonest.auction_date) {
     const parts = soonest.auction_date.split('-');
@@ -211,145 +289,215 @@ function renderNextAuctionLine() {
   } else if (soonest.announcemt_date && soonest.announcemt_date !== 'null') {
     const parts = soonest.announcemt_date.split('-');
     const dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    annFormatted = `size announced ${weekdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}`;
+    annFormatted = `announced ${weekdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}`;
   } else {
-    annFormatted = 'size pending announcement';
+    annFormatted = 'size pending';
   }
 
   nextTextEl.innerHTML = `<strong>${tenor} ${issueLabel}</strong> · ${dateFormatted} 1:00 pm ET · ${annFormatted}`;
 }
 
-function renderHeadlineStrip() {
-  const container = document.getElementById('headlineStrip');
-  if (!container) return;
+// =========================================================================
+// TAB 1: EXECUTIVE OVERVIEW RENDERERS
+// =========================================================================
 
-  const html = BENCHMARK_CODES.map(code => {
-    const stat = state.tenorStatsMap[code];
-    if (!stat) return '';
-    const qClass = stat.quality === 'STRONG' ? 'is-strong' : (stat.quality === 'SOFT' ? 'is-soft' : 'is-inline');
-    const qSymbol = stat.quality === 'STRONG' ? '▲' : (stat.quality === 'SOFT' ? '▼' : '▬');
-    return `
-      <div class="headline-card ${qClass}" data-tenor="${code}">
-        <div class="headline-badge">${stat.tenorCode} <span class="q-symbol">${qSymbol}</span> ${stat.quality}</div>
-        <div class="headline-summary">${stat.summary}</div>
-      </div>
-    `;
-  }).join('');
+function renderOverviewKPIs() {
+  // 1. 10Y Benchmark
+  const stat10Y = state.tenorStatsMap['10Y'];
+  const y10El = document.getElementById('kpi10YYield');
+  const d10El = document.getElementById('kpi10YDelta');
+  const t10El = document.getElementById('kpi10YTag');
+  const b10El = document.getElementById('kpi10YBtc');
 
-  container.innerHTML = html;
+  if (stat10Y) {
+    if (y10El) y10El.textContent = formatPct(stat10Y.highYield);
+    if (d10El) {
+      d10El.textContent = formatBp(stat10Y.deltaHighYieldBp);
+      d10El.className = stat10Y.deltaHighYieldBp > 0 ? 'text-up num' : (stat10Y.deltaHighYieldBp < 0 ? 'text-down num' : 'num');
+    }
+    if (t10El) {
+      t10El.className = `kpi-tag ${stat10Y.quality === 'STRONG' ? 'strong' : (stat10Y.quality === 'SOFT' ? 'soft' : 'inline')}`;
+      t10El.textContent = stat10Y.quality;
+    }
+    if (b10El) {
+      b10El.textContent = `${stat10Y.bidToCover?.toFixed(2)}x BTC`;
+    }
+  }
+
+  // 2. 2s10s Spread
+  const s2s10 = state.spreads?.find(s => s.name === '2s10s');
+  const spValEl = document.getElementById('kpi2s10Val');
+  const spTagEl = document.getElementById('kpi2s10Tag');
+  const spShortEl = document.getElementById('kpi2s10Short');
+  const spLongEl = document.getElementById('kpi2s10Long');
+
+  if (s2s10) {
+    if (spValEl) {
+      spValEl.textContent = formatBp(s2s10.spreadBp);
+      spValEl.className = `kpi-val num ${s2s10.spreadBp < 0 ? 'inverted' : ''}`;
+    }
+    if (spTagEl) {
+      const isInverted = s2s10.spreadBp < 0;
+      spTagEl.className = `kpi-tag ${isInverted ? 'soft' : 'strong'}`;
+      spTagEl.textContent = isInverted ? 'INVERTED' : 'NORMAL';
+    }
+    if (spShortEl) spShortEl.textContent = s2s10.shortYield !== null ? `${s2s10.shortYield.toFixed(3)}%` : '—';
+    if (spLongEl) spLongEl.textContent = s2s10.longYield !== null ? `${s2s10.longYield.toFixed(3)}%` : '—';
+  }
+
+  // 3. Primary Dealer Absorption
+  const dealerPctEl = document.getElementById('kpiDealerPct');
+  const dealerTagEl = document.getElementById('kpiDealerTag');
+  const dealerSubEl = document.getElementById('kpiDealerSub');
+
+  if (stat10Y && stat10Y.shares) {
+    const dlrPct = stat10Y.shares.dealerPct;
+    if (dealerPctEl) dealerPctEl.textContent = dlrPct !== null ? `${dlrPct.toFixed(1)}%` : '—';
+    if (dealerTagEl) {
+      if (dlrPct > 22) {
+        dealerTagEl.className = 'kpi-tag soft';
+        dealerTagEl.textContent = 'HIGH INDIGESTION';
+      } else if (dlrPct < 15) {
+        dealerTagEl.className = 'kpi-tag strong';
+        dealerTagEl.textContent = 'LOW OVERHANG';
+      } else {
+        dealerTagEl.className = 'kpi-tag inline';
+        dealerTagEl.textContent = 'BALANCED';
+      }
+    }
+    if (dealerSubEl) {
+      dealerSubEl.textContent = `Indirect takedown: ${stat10Y.shares.indirectPct?.toFixed(1)}%`;
+    }
+  }
+
+  // 4. Next Upcoming Issuance
+  const soonest = state.upcomingAuctions?.[0];
+  const nextTenorEl = document.getElementById('kpiNextTenor');
+  const nextCountEl = document.getElementById('kpiNextCountdown');
+  const nextDateEl = document.getElementById('kpiNextDate');
+  const nextSizeEl = document.getElementById('kpiNextSize');
+
+  if (soonest) {
+    if (nextTenorEl) nextTenorEl.textContent = `${soonest.tenorCode || soonest.security_term} ${String(soonest.reopening || '').toLowerCase() === 'yes' ? 'Reopen' : 'New'}`;
+    if (nextCountEl) nextCountEl.textContent = getCountdownToET(soonest.auction_date);
+    if (nextDateEl) nextDateEl.textContent = formatShortDate(soonest.auction_date);
+    if (nextSizeEl) nextSizeEl.textContent = soonest.offeringDisplay || 'Size Pending';
+  }
 }
 
-function renderScorecards() {
-  const container = document.getElementById('scorecardsGrid');
+function renderTenorPillsAndFocusCard() {
+  const container = document.getElementById('overviewTenorPills');
   if (!container) return;
 
   const html = BENCHMARK_CODES.map(code => {
     const stat = state.tenorStatsMap[code];
     const isActive = state.activeTenor === code ? 'is-active' : '';
-
-    if (!stat) {
-      return `
-        <div class="tenor-card ${isActive}" data-tenor="${code}">
-          <div class="tc-top">
-            <span class="tc-tenor">${code}</span>
-          </div>
-          <div class="tc-yield">—</div>
-        </div>
-      `;
-    }
-
-    const qClass = stat.quality === 'STRONG' ? 'badge-strong' : (stat.quality === 'SOFT' ? 'badge-soft' : 'badge-inline');
-    const qSymbol = stat.quality === 'STRONG' ? '▲' : (stat.quality === 'SOFT' ? '▼' : '▬');
-    
-    // Delta bp styling
-    let deltaClass = 'tc-delta neutral';
-    let deltaSym = '▬';
-    if (stat.deltaHighYieldBp !== null) {
-      if (stat.deltaHighYieldBp > 0) {
-        deltaClass = 'tc-delta up';
-        deltaSym = '▲';
-      } else if (stat.deltaHighYieldBp < 0) {
-        deltaClass = 'tc-delta down';
-        deltaSym = '▼';
-      }
-    }
-
-    // Dealer vs median text
-    let dealerText = '—';
-    if (stat.dealerPct !== null) {
-      const diff = stat.dealerVsMedianDelta !== null ? `${stat.dealerVsMedianDelta > 0 ? '+' : ''}${stat.dealerVsMedianDelta.toFixed(1)} pp vs med` : '';
-      dealerText = `${stat.dealerPct.toFixed(1)}% <span class="tc-sub-stat">(${diff})</span>`;
-    }
-
-    const btcPctText = stat.btcPercentile !== null ? `${Math.round(stat.btcPercentile)}th pct` : '—';
-    const issueBadge = stat.isReopening ? 'REOPEN' : 'NEW';
+    const yieldText = stat?.highYield !== null && stat?.highYield !== undefined ? `${stat.highYield.toFixed(3)}%` : '—';
+    const qClass = stat?.quality === 'STRONG' ? 'strong' : (stat?.quality === 'SOFT' ? 'soft' : 'inline');
 
     return `
-      <button class="tenor-card ${isActive}" data-tenor="${code}" aria-pressed="${state.activeTenor === code}">
-        <div class="tc-header">
-          <div class="tc-title-wrap">
-            <span class="tc-code">${stat.tenorCode}</span>
-            <span class="tc-issue-tag">${issueBadge}</span>
-          </div>
-          <span class="tc-quality ${qClass}">${qSymbol} ${stat.quality}</span>
-        </div>
-
-        <div class="tc-yield-row">
-          <span class="tc-yield num">${formatPct(stat.highYield)}</span>
-          <span class="${deltaClass} num">${deltaSym} ${formatBp(stat.deltaHighYieldBp, 1, false)}</span>
-        </div>
-
-        <div class="tc-metrics-grid">
-          <div class="tc-metric">
-            <span class="tc-lbl">Bid-to-Cover</span>
-            <span class="tc-val num">${stat.bidToCover !== null ? `${stat.bidToCover.toFixed(2)}x` : '—'} <span class="tc-pct">${btcPctText}</span></span>
-          </div>
-          <div class="tc-metric">
-            <span class="tc-lbl">Dealer Take</span>
-            <span class="tc-val num">${dealerText}</span>
-          </div>
-        </div>
-
-        <div class="tc-footer">
-          <span class="tc-date num">${formatShortDate(stat.auctionDate)}</span>
-          <div class="tc-spark">${renderSparklineSvg(stat.sparklineData)}</div>
-        </div>
+      <button class="tenor-pill-btn ${isActive}" data-tenor="${code}" aria-pressed="${state.activeTenor === code}">
+        <span class="pill-status-dot ${qClass}"></span>
+        <span class="pill-tenor-code">${code}</span>
+        <span class="pill-yield num">${yieldText}</span>
       </button>
     `;
   }).join('');
 
   container.innerHTML = html;
 
-  // Add click listeners
-  container.querySelectorAll('.tenor-card').forEach(btn => {
+  // Add click handlers
+  container.querySelectorAll('.tenor-pill-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tenor = btn.getAttribute('data-tenor');
       if (tenor && tenor !== state.activeTenor) {
         state.activeTenor = tenor;
-        renderScorecards();
+        renderTenorPillsAndFocusCard();
         renderActiveTenorDetails();
         renderActiveTakedownChart(state.activeTenor);
       }
     });
   });
+
+  // Render the Focused Tenor Card
+  renderFocusedTenorCard();
+}
+
+function renderFocusedTenorCard() {
+  const stat = state.tenorStatsMap[state.activeTenor];
+  if (!stat) return;
+
+  const codeEl = document.getElementById('focusTenorCode');
+  const issueEl = document.getElementById('focusIssueBadge');
+  const qualityEl = document.getElementById('focusQualityBadge');
+  const yieldEl = document.getElementById('focusHighYield');
+  const deltaEl = document.getElementById('focusDeltaYield');
+  const btcValEl = document.getElementById('focusBtcVal');
+  const btcPctEl = document.getElementById('focusBtcPct');
+  const takedownSumEl = document.getElementById('focusTakedownSummary');
+  const takedownBarEl = document.getElementById('focusTakedownBar');
+  const stopVsMedEl = document.getElementById('focusStopVsMed');
+  const allocHighEl = document.getElementById('focusAllocHigh');
+  const askAiBtn = document.getElementById('btnAskAiTenor');
+
+  if (codeEl) codeEl.textContent = `${stat.tenorCode} Benchmark Security`;
+  if (issueEl) issueEl.textContent = stat.isReopening ? 'REOPENING' : 'NEW ISSUE';
+  if (qualityEl) {
+    qualityEl.className = `quality-badge ${stat.quality === 'STRONG' ? 'strong' : (stat.quality === 'SOFT' ? 'soft' : 'inline')}`;
+    qualityEl.textContent = `${stat.quality} (${stat.summary})`;
+  }
+  if (yieldEl) yieldEl.textContent = formatPct(stat.highYield);
+  if (deltaEl) {
+    deltaEl.textContent = formatBp(stat.deltaHighYieldBp);
+    deltaEl.className = `focus-delta num ${stat.deltaHighYieldBp > 0 ? 'text-up' : (stat.deltaHighYieldBp < 0 ? 'text-down' : '')}`;
+  }
+  if (btcValEl) btcValEl.textContent = stat.bidToCover !== null ? `${stat.bidToCover.toFixed(2)}x` : '—';
+  if (btcPctEl) {
+    const pct = stat.btcPercentile !== null ? Math.round(stat.btcPercentile) : '—';
+    btcPctEl.textContent = `${pct}th percentile vs norm (${stat.trailingMeanBtc?.toFixed(2)}x)`;
+  }
+  if (takedownSumEl && stat.shares) {
+    takedownSumEl.textContent = `Ind: ${stat.shares.indirectPct?.toFixed(1)}% · Dir: ${stat.shares.directPct?.toFixed(1)}% · Dlr: ${stat.shares.dealerPct?.toFixed(1)}%`;
+  }
+  if (takedownBarEl && stat.shares) {
+    const ind = stat.shares.indirectPct || 0;
+    const dir = stat.shares.directPct || 0;
+    const dlr = stat.shares.dealerPct || 0;
+    takedownBarEl.innerHTML = `
+      <div class="takedown-bar-seg indirect" style="width: ${ind}%;" title="Indirect ${ind.toFixed(1)}%"></div>
+      <div class="takedown-bar-seg direct" style="width: ${dir}%;" title="Direct ${dir.toFixed(1)}%"></div>
+      <div class="takedown-bar-seg dealer" style="width: ${dlr}%;" title="Primary Dealer ${dlr.toFixed(1)}%"></div>
+    `;
+  }
+  if (stopVsMedEl) stopVsMedEl.textContent = formatBp(stat.stopVsMedianBp);
+  if (allocHighEl) allocHighEl.textContent = stat.allocationAtHighPct !== null ? `${stat.allocationAtHighPct.toFixed(1)}% alloc at high` : '—';
+  
+  if (askAiBtn) {
+    askAiBtn.setAttribute('data-ask-ai', `Analyze the latest ${stat.tenorCode} Treasury auction telemetry, demand shares, and quality rating in depth.`);
+  }
 }
 
 function renderActiveTenorDetails() {
   const stat = state.tenorStatsMap[state.activeTenor];
   const titleEl = document.getElementById('activeTenorTitle');
-  const badgeEl = document.getElementById('activeTenorBadge');
   const btcMeanEl = document.getElementById('activeTenorBtcMean');
+  const demandTabTitle = document.getElementById('demandTabTitle');
+  const demandTabBtcNorm = document.getElementById('demandTabBtcNorm');
   const heatStripEl = document.getElementById('activeTenorHeatStrip');
+  const btnAskAiDemand = document.getElementById('btnAskAiDemandTab');
 
   if (titleEl) titleEl.textContent = `${state.activeTenor} Demand Dynamics`;
+  if (demandTabTitle) demandTabTitle.textContent = `${state.activeTenor} Demand Dynamics & Heatmap`;
   
   if (stat) {
-    if (badgeEl) {
-      badgeEl.className = `quality-badge ${stat.quality === 'STRONG' ? 'strong' : (stat.quality === 'SOFT' ? 'soft' : 'inline')}`;
-      badgeEl.textContent = `${stat.quality} (${stat.summary})`;
-    }
     if (btcMeanEl && stat.trailingMeanBtc !== null) {
       btcMeanEl.textContent = `Trailing 20 Norm: ${stat.trailingMeanBtc.toFixed(2)}x BTC`;
+    }
+    if (demandTabBtcNorm && stat.trailingMeanBtc !== null) {
+      demandTabBtcNorm.textContent = `Trailing 20 Norm: ${stat.trailingMeanBtc.toFixed(2)}x BTC`;
+    }
+    if (btnAskAiDemand) {
+      btnAskAiDemand.setAttribute('data-ask-ai', `Analyze ${state.activeTenor} demand dynamics, dealer absorption, and quality rating.`);
     }
   }
 
@@ -385,17 +533,42 @@ function renderActiveTenorDetails() {
 
     heatStripEl.innerHTML = cellsHtml;
   }
+
+  // Update focused card
+  renderFocusedTenorCard();
 }
+
+function renderHeadlineStrip() {
+  const container = document.getElementById('headlineStrip');
+  if (!container) return;
+
+  const html = BENCHMARK_CODES.map(code => {
+    const stat = state.tenorStatsMap[code];
+    if (!stat) return '';
+    const qClass = stat.quality === 'STRONG' ? 'is-strong' : (stat.quality === 'SOFT' ? 'is-soft' : 'is-inline');
+    const qSymbol = stat.quality === 'STRONG' ? '▲' : (stat.quality === 'SOFT' ? '▼' : '▬');
+    return `
+      <div class="headline-card ${qClass}" data-tenor="${code}">
+        <div class="headline-badge">${stat.tenorCode} <span class="q-symbol">${qSymbol}</span> ${stat.quality}</div>
+        <div class="headline-summary">${stat.summary}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+// =========================================================================
+// TAB 2: CURVE & SPREADS RENDERERS
+// =========================================================================
 
 function renderSpreadsTable() {
   const container = document.getElementById('spreadsTableBody');
   if (!container) return;
 
   const html = state.spreads.map(sp => {
-    let spreadClass = 'num';
-    if (sp.spreadBp !== null) {
-      if (sp.spreadBp < 0) spreadClass += ' inverted';
-    }
+    const isInverted = sp.spreadBp !== null && sp.spreadBp < 0;
+    const spreadClass = `num ${isInverted ? 'inverted' : ''}`;
 
     return `
       <tr>
@@ -408,46 +581,43 @@ function renderSpreadsTable() {
   }).join('');
 
   container.innerHTML = html;
-}
 
-function renderUpcomingTimeline() {
-  const container = document.getElementById('upcomingTimelineList');
-  if (!container) return;
-
-  if (!state.upcomingAuctions || state.upcomingAuctions.length === 0) {
-    container.innerHTML = '<div class="empty-state">No future auctions scheduled in Fiscal Data feed.</div>';
-    return;
+  // Update curve insight text
+  const insightEl = document.getElementById('curveInsightText');
+  const s2s10 = state.spreads.find(s => s.name === '2s10s');
+  if (insightEl && s2s10) {
+    if (s2s10.spreadBp < 0) {
+      insightEl.innerHTML = `<strong>Curve Inversion Detected:</strong> The benchmark <strong>2s10s spread is inverted at ${s2s10.spreadBp.toFixed(1)} bp</strong>. Historically, sustained inversion reflects tight monetary conditions and anticipation of future rate cuts.`;
+    } else {
+      insightEl.innerHTML = `<strong>Normal Term Structure:</strong> The <strong>2s10s spread is positive at +${s2s10.spreadBp.toFixed(1)} bp</strong>, reflecting typical upward-sloping term premium and duration compensation.`;
+    }
   }
-
-  // Filter to next 14 auctions
-  const nextAuctions = state.upcomingAuctions.slice(0, 10);
-
-  const html = nextAuctions.map(item => {
-    const countdown = getCountdownToET(item.auction_date, item.security_type === 'FRN' ? '11:30' : '13:00');
-    const isReopen = String(item.reopening || '').toLowerCase() === 'yes';
-
-    return `
-      <div class="upcoming-item">
-        <div class="up-time-col">
-          <span class="up-date num">${formatShortDate(item.auction_date)}</span>
-          <span class="up-countdown num">${countdown}</span>
-        </div>
-        <div class="up-details-col">
-          <div class="up-title-row">
-            <span class="up-tenor"><strong>${item.tenorCode || item.security_term}</strong></span>
-            <span class="up-badge ${isReopen ? 'reopen' : 'new'}">${isReopen ? 'REOPEN' : 'NEW'}</span>
-          </div>
-          <div class="up-sub-row">
-            <span class="up-amt">${item.offeringDisplay}</span>
-            <span class="up-cusip mono">${item.cusip || 'Pending'}</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = html;
 }
+
+// =========================================================================
+// TAB 3: DEMAND DYNAMICS TAB
+// =========================================================================
+
+function renderDemandDynamicsTab() {
+  const navContainer = document.getElementById('demandTenorNav');
+  if (!navContainer) return;
+
+  navContainer.querySelectorAll('.tenor-pill-btn').forEach(btn => {
+    const code = btn.getAttribute('data-tenor');
+    btn.classList.toggle('is-active', code === state.activeTenor);
+    btn.onclick = () => {
+      state.activeTenor = code;
+      renderDemandDynamicsTab();
+      renderTenorPillsAndFocusCard();
+      renderActiveTenorDetails();
+      renderActiveTakedownChart(state.activeTenor);
+    };
+  });
+}
+
+// =========================================================================
+// TAB 4: HISTORICAL LEDGER RENDERERS
+// =========================================================================
 
 function renderLedgerTable() {
   const tbody = document.getElementById('ledgerTableBody');
@@ -455,7 +625,6 @@ function renderLedgerTable() {
   const paginationEl = document.getElementById('ledgerPagination');
   if (!tbody) return;
 
-  // Filter nominalAuctions
   let filtered = [...state.nominalAuctions];
 
   if (state.ledgerFilters.tenor !== 'ALL') {
@@ -480,7 +649,6 @@ function renderLedgerTable() {
   state.filteredLedger = filtered;
   if (countEl) countEl.textContent = `${filtered.length} Auctions`;
 
-  // Pagination
   const { page, pageSize } = state.ledgerFilters;
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const currentPage = Math.min(page, totalPages);
@@ -489,12 +657,10 @@ function renderLedgerTable() {
   const startIdx = (currentPage - 1) * pageSize;
   const pagedRows = filtered.slice(startIdx, startIdx + pageSize);
 
-  // Compute prior auction map for delta high yield
   const tenorPriorMap = new Map();
   for (let i = 0; i < filtered.length; i++) {
     const row = filtered[i];
     const code = getTenorCode(row);
-    // Find next auction of same tenor in chronological descending order
     for (let j = i + 1; j < filtered.length; j++) {
       if (getTenorCode(filtered[j]) === code) {
         tenorPriorMap.set(row.cusip + '_' + row.auction_date, filtered[j]);
@@ -508,12 +674,10 @@ function renderLedgerTable() {
     const isReopen = String(row.reopening || '').toLowerCase() === 'yes';
     const highYield = parseNum(row.high_yield);
     
-    // Prior delta
     const priorRow = tenorPriorMap.get(row.cusip + '_' + row.auction_date);
     const priorYield = priorRow ? parseNum(priorRow.high_yield) : null;
     const deltaBp = (highYield !== null && priorYield !== null) ? (highYield - priorYield) * 100 : null;
 
-    // Takedown & Quality
     const shares = calculateTakedownShares(row);
     const btc = parseNum(row.bid_to_cover_ratio);
     const stopVsMed = calculateStopVsMedianBps(row);
@@ -542,7 +706,6 @@ function renderLedgerTable() {
 
   tbody.innerHTML = rowsHtml;
 
-  // Add click handler to select auction
   tbody.querySelectorAll('.ledger-row').forEach(tr => {
     tr.addEventListener('click', () => {
       const cusip = tr.getAttribute('data-cusip');
@@ -556,7 +719,6 @@ function renderLedgerTable() {
     });
   });
 
-  // Render pagination buttons
   if (paginationEl) {
     paginationEl.innerHTML = `
       <button class="pg-btn" id="pgPrev" ${currentPage <= 1 ? 'disabled' : ''}>← Prev</button>
@@ -588,7 +750,6 @@ export function openInspectorDrawer(auction) {
   const shares = calculateTakedownShares(auction);
   const stopVsMed = calculateStopVsMedianBps(auction);
   const allocHigh = getAllocationAtHighPct(auction);
-  const compAccepted = parseNum(auction.comp_accepted);
   const nonComp = parseNum(auction.noncomp_accepted);
   const soma = parseNum(auction.soma_accepted);
   const totalAccepted = parseNum(auction.total_accepted);
@@ -601,7 +762,6 @@ export function openInspectorDrawer(auction) {
   const price = parseNum(auction.price_per100);
 
   const compPdf = auction.pdf_filenm_comp_results ? `https://www.treasurydirect.gov/instit/annceresult/press/preanre/${auction.pdf_filenm_comp_results.substring(0, 4)}/${auction.pdf_filenm_comp_results}` : null;
-  const annPdf = auction.pdf_filenm_announcemt ? `https://www.treasurydirect.gov/instit/annceresult/press/preanre/${auction.pdf_filenm_announcemt.substring(0, 4)}/${auction.pdf_filenm_announcemt}` : null;
 
   document.getElementById('inspTitle').textContent = `${getTenorCode(auction) || auction.security_term} Auction Telemetry`;
   document.getElementById('inspCusip').textContent = auction.cusip || '—';
@@ -638,6 +798,16 @@ export function openInspectorDrawer(auction) {
     }
   }
 
+  // Connect drawer's Ask AI button
+  const inspAskAiBtn = document.getElementById('btnInspAskAi');
+  if (inspAskAiBtn) {
+    inspAskAiBtn.onclick = () => {
+      closeInspectorDrawer();
+      chatbot.open();
+      chatbot.ask(`Explain the ${getTenorCode(auction) || auction.security_term} auction from ${auction.auction_date} (CUSIP: ${auction.cusip}) in depth.`);
+    };
+  }
+
   drawer.classList.add('is-open');
   backdrop.classList.add('is-open');
 }
@@ -647,7 +817,53 @@ export function closeInspectorDrawer() {
   document.getElementById('inspectorBackdrop')?.classList.remove('is-open');
 }
 
-// CSV Export
+// =========================================================================
+// TAB 5: UPCOMING SCHEDULE RENDERER
+// =========================================================================
+
+function renderUpcomingTimeline() {
+  const container = document.getElementById('upcomingTimelineList');
+  if (!container) return;
+
+  if (!state.upcomingAuctions || state.upcomingAuctions.length === 0) {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ff-text-3);">No future auctions scheduled in Fiscal Data feed.</div>';
+    return;
+  }
+
+  const nextAuctions = state.upcomingAuctions.slice(0, 14);
+
+  const html = nextAuctions.map(item => {
+    const countdown = getCountdownToET(item.auction_date, item.security_type === 'FRN' ? '11:30' : '13:00');
+    const isReopen = String(item.reopening || '').toLowerCase() === 'yes';
+
+    return `
+      <div class="upcoming-item">
+        <div class="up-time-col">
+          <span class="up-date num">${formatShortDate(item.auction_date)}</span>
+          <span class="up-countdown num">${countdown}</span>
+        </div>
+        <div class="up-details-col">
+          <div class="up-title-row">
+            <span class="up-tenor"><strong>${item.tenorCode || item.security_term}</strong></span>
+            <span class="up-badge ${isReopen ? 'reopen' : 'new'}">${isReopen ? 'REOPEN' : 'NEW'}</span>
+          </div>
+          <div class="up-sub-row">
+            <span class="up-amt">${item.offeringDisplay}</span>
+            <span>·</span>
+            <span class="up-cusip mono">CUSIP: ${item.cusip || 'Pending'}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+// =========================================================================
+// CSV EXPORT & CLOCK
+// =========================================================================
+
 function exportLedgerToCsv() {
   if (!state.nominalAuctions || state.nominalAuctions.length === 0) return;
 
@@ -705,14 +921,13 @@ function exportLedgerToCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `US_Treasury_Bond_Auctions_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `Futures_First_US_Treasury_Auctions_${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-// Live ET Clock
 function initClock() {
   const clockEl = document.getElementById('clockET');
   function update() {
@@ -731,15 +946,16 @@ function initClock() {
 }
 
 // =========================================================================
-// MAIN INITIALIZATION WORKFLOW
+// APP INITIALIZATION
 // =========================================================================
 
 export async function initApp() {
+  initTheme();
   initClock();
+  chatbot.init();
   setupEventListeners();
 
   try {
-    // 1. Fetch auctions, upcoming schedule, and optional WI data
     const [auctionsRes, upcomingRes, wiData] = await Promise.all([
       loadAuctionsData(),
       loadUpcomingData(),
@@ -754,7 +970,7 @@ export async function initApp() {
     state.upcomingAuctions = processUpcomingAuctions(upcomingRes.raw);
     state.error = null;
 
-    // 2. Compute Trailing 20 stats per benchmark tenor
+    // Compute Trailing 20 stats per benchmark tenor
     for (const code of BENCHMARK_CODES) {
       const list = state.nominalAuctions
         .filter(a => getTenorCode(a) === code)
@@ -762,24 +978,25 @@ export async function initApp() {
       state.tenorStatsMap[code] = computeTenorStats(list, code, 20);
     }
 
-    // 3. Compute benchmark spreads
+    // Compute benchmark spreads
     state.spreads = computeSpreads(state.tenorStatsMap);
 
-    // 4. Default selected auction to latest 10Y or latest nominal
+    // Default selected auction
     if (!state.selectedAuction && state.nominalAuctions.length > 0) {
       const default10Y = state.nominalAuctions.find(a => getTenorCode(a) === '10Y');
       state.selectedAuction = default10Y || state.nominalAuctions[0];
     }
 
-    // 5. Render All Components
+    // Render All Views
     renderHeaderStatus();
     renderNextAuctionLine();
-    renderHeadlineStrip();
-    renderScorecards();
+    renderOverviewKPIs();
+    renderTenorPillsAndFocusCard();
     renderActiveTenorDetails();
     renderActiveTakedownChart(state.activeTenor);
     renderYieldCurveChart();
     renderSpreadsTable();
+    renderHeadlineStrip();
     renderUpcomingTimeline();
     renderLedgerTable();
 
@@ -791,18 +1008,46 @@ export async function initApp() {
 }
 
 function setupEventListeners() {
-  // Sync button
-  document.getElementById('btnSync')?.addEventListener('click', () => {
-    initApp();
+  // Sidebar navigation tabs
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      if (tab) switchTab(tab);
+    });
   });
 
-  // Retry button
-  document.getElementById('btnRetry')?.addEventListener('click', () => {
-    initApp();
+  // Direct tab link buttons from Overview panels
+  document.querySelectorAll('[data-nav-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-nav-target');
+      if (target) switchTab(target);
+    });
   });
+
+  // Brand link resets to overview
+  document.getElementById('brandHomeLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchTab('overview');
+  });
+
+  // Mobile menu toggle
+  document.getElementById('btnMobileMenu')?.addEventListener('click', () => {
+    document.getElementById('workspace-nav')?.classList.toggle('mobile-open');
+  });
+
+  // Theme toggle
+  document.getElementById('btnThemeToggle')?.addEventListener('click', toggleTheme);
+
+  // Sync button
+  document.getElementById('btnSync')?.addEventListener('click', () => initApp());
+  document.getElementById('btnRetry')?.addEventListener('click', () => initApp());
 
   // CSV Export
   document.getElementById('btnExport')?.addEventListener('click', exportLedgerToCsv);
+
+  // Chatbot floating triggers
+  document.getElementById('btnOpenChat')?.addEventListener('click', () => chatbot.toggle());
+  document.getElementById('chatFloatingBtn')?.addEventListener('click', () => chatbot.open());
 
   // Inspector Drawer close
   document.getElementById('btnInspClose')?.addEventListener('click', closeInspectorDrawer);
@@ -812,7 +1057,9 @@ function setupEventListeners() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeInspectorDrawer();
+      chatbot.close();
       document.getElementById('apiGuideModal')?.classList.remove('is-open');
+      document.getElementById('workspace-nav')?.classList.remove('mobile-open');
     }
   });
 

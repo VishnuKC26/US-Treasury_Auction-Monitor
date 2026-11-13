@@ -10,6 +10,8 @@ export const state = {
   dataSource: 'loading',
   dataTimestamp: null,
   activeTenor: '10Y',
+  activeTab: 'overview',
+  theme: 'light',
   tenorStatsMap: {},
   spreads: [],
   filteredLedger: [],

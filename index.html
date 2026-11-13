@@ -1,302 +1,719 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>US Treasury Auction Monitor // Institutional Telemetry</title>
-  <meta name="description" content="Institutional US Treasury Securities Auction Monitor for nominal benchmarks (2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y). Real-time demand grading, allotment dynamics, and yield curve spreads.">
+  <title>US Treasury Auctions Monitor // Futures First Institutional Telemetry</title>
+  <meta name="description" content="Institutional US Treasury Securities Auction Monitor for nominal benchmarks (2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y). Real-time demand grading, allotment dynamics, yield curve spreads, and AI institutional analyst.">
   
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
   
-  <!-- Preconnect & Fonts -->
+  <!-- Preconnect & Google Fonts: Kanit (Display), Outfit (UI), JetBrains Mono (Figures) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="styles.css">
+
+  <!-- Theme init before paint to prevent flash -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('ff-theme');
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
 
-  <!-- SLIM COMMAND HEADER -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="brand-badge">UST</div>
-      <div class="brand-info">
-        <h1 class="brand-title">US TREASURY AUCTION MONITOR</h1>
-        <div class="brand-meta">
+  <div class="hub-shell">
+    
+    <!-- =====================================================================
+         1. SIDEBAR NAVIGATION (Futures First Navy Theme)
+         ===================================================================== -->
+    <nav id="workspace-nav" class="sidebar" aria-label="Workspace Navigation">
+      <!-- Brand Header -->
+      <div class="sidebar-header">
+        <a href="#" class="brand-link" id="brandHomeLink">
+          <div class="brand-logo-mark">FF</div>
+          <div class="brand-titles">
+            <span class="brand-main">Futures First</span>
+            <span class="brand-sub">Treasury Monitor</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="sidebar-nav" role="tablist" aria-label="Dashboard sections">
+        <div class="nav-section-title">Workspace Views</div>
+
+        <button class="nav-item is-active" data-tab="overview" role="tab" aria-selected="true" id="navTabOverview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="7" height="7" x="3" y="3" rx="1"></rect>
+            <rect width="7" height="7" x="14" y="3" rx="1"></rect>
+            <rect width="7" height="7" x="14" y="14" rx="1"></rect>
+            <rect width="7" height="7" x="3" y="14" rx="1"></rect>
+          </svg>
+          <span class="nav-label">Executive Overview</span>
+        </button>
+
+        <button class="nav-item" data-tab="curve" role="tab" aria-selected="false" id="navTabCurve">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span class="nav-label">Yield Curve & Spreads</span>
+        </button>
+
+        <button class="nav-item" data-tab="demand" role="tab" aria-selected="false" id="navTabDemand">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span class="nav-label">Demand Dynamics</span>
+        </button>
+
+        <button class="nav-item" data-tab="ledger" role="tab" aria-selected="false" id="navTabLedger">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+            <path d="M3 9h18"></path>
+            <path d="M3 15h18"></path>
+            <path d="M9 3v18"></path>
+          </svg>
+          <span class="nav-label">Results Ledger</span>
+        </button>
+
+        <button class="nav-item" data-tab="upcoming" role="tab" aria-selected="false" id="navTabUpcoming">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="nav-label">Upcoming Schedule</span>
+        </button>
+
+        <div class="nav-section-title" style="margin-top: 12px;">Intelligence</div>
+
+        <button class="nav-item" data-tab="chat" role="tab" aria-selected="false" id="navTabChat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
+          </svg>
+          <span class="nav-label">AI Analyst</span>
+          <span class="nav-badge">NEW</span>
+        </button>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="sidebar-status-line">
           <span class="status-dot-wrap">
             <span class="status-dot live" id="statusDot"></span>
             <span id="statusText">CONNECTING</span>
           </span>
-          <span class="meta-sep">·</span>
-          <span>Data as of <span id="asOfTime" class="num mono">--:--:--</span></span>
-          <span class="meta-sep">·</span>
-          <span>Source: <a href="https://fiscaldata.treasury.gov/datasets/treasury-securities-auctions-data/treasury-securities-auctions-data" target="_blank" rel="noopener">Fiscal Data API</a></span>
+          <span class="clock-val num" id="clockET">--:--:-- ET</span>
+        </div>
+
+        <div class="sidebar-theme-controls">
+          <button class="theme-toggle-btn" id="btnThemeToggle" title="Toggle Light/Dark Theme">
+            <svg id="themeIconSun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <span id="themeToggleText">Light Mode</span>
+          </button>
         </div>
       </div>
-    </div>
+    </nav>
 
-    <!-- Static Next Auction Line -->
-    <div class="header-center">
-      <div class="next-auction-pill" id="headerNextLine" aria-label="Next upcoming auction">
-        <span class="next-tag">NEXT</span>
-        <span id="nextAuctionText" class="next-text">Loading upcoming schedule...</span>
-      </div>
-    </div>
+    <!-- =====================================================================
+         2. MAIN VIEWPORT & TOPBAR
+         ===================================================================== -->
+    <main class="detail-main" id="workspace-content">
 
-    <!-- Header Actions -->
-    <div class="header-right">
-      <div class="clock-display" aria-label="New York Time">
-        <span class="clock-label">ET CLOCK</span>
-        <span class="clock-val num mono" id="clockET">--:--:-- ET</span>
-      </div>
-
-      <div class="header-actions">
-        <button class="btn-action primary" id="btnSync" title="Sync live feed">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          Sync
-        </button>
-
-        <button class="btn-action" id="btnExport" title="Export current dataset as CSV">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          CSV
-        </button>
-
-        <button class="btn-action" id="btnApiGuide" title="API Quick Guide">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          API
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- ALERT BANNERS -->
-  <div id="errorBanner" class="alert-banner is-hidden" role="alert">
-    <div class="alert-content">
-      <span class="alert-icon">⚠️</span>
-      <span id="errorBannerMsg">Unable to connect to live Treasury Fiscal Data API.</span>
-      <button id="btnRetry" class="btn-retry">Retry Connection</button>
-    </div>
-  </div>
-
-  <div id="staleBanner" class="alert-banner warning is-hidden" role="status">
-    <div class="alert-content">
-      <span class="alert-icon">⚡</span>
-      <span>STALE SAMPLE DATA: Live API proxy is currently unreachable. Displaying cached baseline data.</span>
-    </div>
-  </div>
-
-  <!-- MAIN TERMINAL VIEWPORT -->
-  <main class="terminal-main" id="terminalMain">
-
-    <!-- 1. HEADLINE STRIP: Deterministic One-Line Summaries -->
-    <section class="section-headline">
-      <div class="section-label">EXECUTIVE BENCHMARK TELEMETRY</div>
-      <div class="headline-strip" id="headlineStrip" aria-live="polite">
-        <!-- Skeletons initially -->
-        <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
-        <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
-        <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
-      </div>
-    </section>
-
-    <!-- 2. TENOR SCORECARDS (2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y) -->
-    <section class="section-scorecards">
-      <div class="scorecards-grid" id="scorecardsGrid" role="region" aria-label="Tenor benchmark cards">
-        <!-- 7 Skeleton cards initially -->
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-        <div class="tenor-card skeleton-card"><div class="skeleton-line half"></div><div class="skeleton-line full"></div><div class="skeleton-line three-quarter"></div></div>
-      </div>
-    </section>
-
-    <!-- 3. MIDDLE ROW: Demand Dynamics (Left) + Curve & Spreads (Center) + Upcoming Timeline (Right) -->
-    <section class="middle-deck-grid">
-
-      <!-- LEFT: Demand Quality & Takedown Shares (Active Tenor) -->
-      <article class="panel panel-demand">
-        <div class="panel-header">
-          <div class="ph-title-wrap">
-            <h2 class="panel-title" id="activeTenorTitle">10Y Demand Dynamics</h2>
-            <span class="norm-tag num" id="activeTenorBtcMean">Trailing 20 Norm: --x BTC</span>
+      <!-- TOPBAR -->
+      <header class="hub-topbar">
+        <div class="topbar-left">
+          <button class="menu-toggle-btn" id="btnMobileMenu" aria-label="Toggle navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div class="page-title-wrap">
+            <h1 class="page-title" id="pageTitleHeading">Executive Overview</h1>
+            <span class="page-subtitle">U.S. Treasury Benchmark Auctions Telemetry</span>
           </div>
-          <span class="quality-badge inline" id="activeTenorBadge">IN LINE</span>
         </div>
 
-        <div class="panel-body">
-          <!-- Heat Strip of trailing auctions -->
-          <div class="demand-heat-section">
-            <div class="sub-label">TRAILING AUCTIONS DEMAND HEATMAP (BTC & DEALER ABSORPTION)</div>
-            <div class="heat-strip-scroll">
-              <div class="heat-strip" id="activeTenorHeatStrip">
-                <!-- Skeletons -->
-                <div class="heat-cell skeleton-cell"></div>
-                <div class="heat-cell skeleton-cell"></div>
-                <div class="heat-cell skeleton-cell"></div>
-                <div class="heat-cell skeleton-cell"></div>
+        <!-- Center: Next Auction Line -->
+        <div class="topbar-center">
+          <div class="next-auction-pill" id="headerNextLine" aria-label="Next upcoming auction">
+            <span class="next-tag">NEXT</span>
+            <span id="nextAuctionText" class="next-text">Loading upcoming schedule...</span>
+          </div>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="topbar-right">
+          <button class="btn-topbar primary" id="btnSync" title="Sync live feed from Treasury Fiscal Data API">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Sync
+          </button>
+
+          <button class="btn-topbar" id="btnExport" title="Export current dataset as CSV">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            CSV
+          </button>
+
+          <button class="btn-topbar" id="btnApiGuide" title="API Quick Guide">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            API
+          </button>
+
+          <button class="btn-topbar ai-highlight" id="btnOpenChat" title="Open AI Auction Analyst Chatbot">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
+            </svg>
+            Ask AI
+          </button>
+        </div>
+      </header>
+
+      <!-- ALERT BANNERS -->
+      <div id="errorBanner" class="alert-banner is-hidden" role="alert">
+        <div class="alert-content">
+          <span>⚠️</span>
+          <span id="errorBannerMsg">Unable to connect to live Treasury Fiscal Data API.</span>
+          <button id="btnRetry" class="btn-retry">Retry Connection</button>
+        </div>
+      </div>
+
+      <div id="staleBanner" class="alert-banner warning is-hidden" role="status">
+        <div class="alert-content">
+          <span>⚡</span>
+          <span>STALE SAMPLE DATA: Live API proxy is currently unreachable. Displaying cached baseline data.</span>
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           VIEW TAB 1: EXECUTIVE OVERVIEW (Decluttered, High-Impact)
+           ===================================================================== -->
+      <section class="tab-content is-active" id="tabOverview" role="tabpanel" aria-labelledby="navTabOverview">
+        
+        <!-- 1. Key Performance Indicators (4 Clean Tiles) -->
+        <div class="overview-kpis">
+          <div class="kpi-card accent-blue">
+            <div class="kpi-head">
+              <span class="kpi-label">10Y Benchmark Yield</span>
+              <span class="kpi-tag inline" id="kpi10YTag">--</span>
+            </div>
+            <div class="kpi-val num" id="kpi10YYield">--%</div>
+            <div class="kpi-meta">
+              <span id="kpi10YDelta" class="num">-- bp</span> vs prior
+              <span>·</span>
+              <span id="kpi10YBtc" class="num">--x BTC</span>
+            </div>
+          </div>
+
+          <div class="kpi-card accent-orange">
+            <div class="kpi-head">
+              <span class="kpi-label">2s10s Curve Spread</span>
+              <span class="kpi-tag inline" id="kpi2s10Tag">--</span>
+            </div>
+            <div class="kpi-val num" id="kpi2s10Val">-- bp</div>
+            <div class="kpi-meta">
+              <span>Short: <strong class="num" id="kpi2s10Short">--%</strong></span>
+              <span>·</span>
+              <span>Long: <strong class="num" id="kpi2s10Long">--%</strong></span>
+            </div>
+          </div>
+
+          <div class="kpi-card accent-teal">
+            <div class="kpi-head">
+              <span class="kpi-label">Primary Dealer Absorption</span>
+              <span class="kpi-tag inline" id="kpiDealerTag">--</span>
+            </div>
+            <div class="kpi-val num" id="kpiDealerPct">--%</div>
+            <div class="kpi-meta">
+              <span id="kpiDealerSub">End-investor demand healthy</span>
+            </div>
+          </div>
+
+          <div class="kpi-card accent-navy">
+            <div class="kpi-head">
+              <span class="kpi-label">Next Scheduled Issuance</span>
+              <span class="kpi-tag strong" id="kpiNextCountdown">--</span>
+            </div>
+            <div class="kpi-val" style="font-size: 20px;" id="kpiNextTenor">Loading...</div>
+            <div class="kpi-meta">
+              <span id="kpiNextDate">1:00 PM ET</span>
+              <span>·</span>
+              <span id="kpiNextSize" class="num">$0B</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Tenor Selector Bar & Focused Benchmark Card -->
+        <section class="section-tenor-matrix">
+          <div class="section-label">SELECT BENCHMARK MATURITY FOR TELEMETRY</div>
+          
+          <div class="tenor-pills-bar" id="overviewTenorPills">
+            <!-- Dynamically populated or rendered -->
+            <button class="tenor-pill-btn" data-tenor="2Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">2Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn" data-tenor="3Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">3Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn" data-tenor="5Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">5Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn" data-tenor="7Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">7Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn is-active" data-tenor="10Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">10Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn" data-tenor="20Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">20Y</span><span class="pill-yield num">--%</span></button>
+            <button class="tenor-pill-btn" data-tenor="30Y"><span class="pill-status-dot inline"></span><span class="pill-tenor-code">30Y</span><span class="pill-yield num">--%</span></button>
+          </div>
+
+          <!-- Focused Benchmark Card -->
+          <div class="focused-tenor-card" id="focusedTenorCard">
+            <div class="focus-col-main">
+              <div class="focus-tenor-label">
+                <span class="focus-code" id="focusTenorCode">10Y Benchmark Note</span>
+                <span class="focus-issue-badge" id="focusIssueBadge">NEW ISSUE</span>
+                <span class="quality-badge inline" id="focusQualityBadge">IN LINE</span>
+              </div>
+              <div class="focus-yield-row">
+                <span class="focus-yield-val num" id="focusHighYield">--%</span>
+                <span class="focus-delta num" id="focusDeltaYield">-- bp</span>
+              </div>
+            </div>
+
+            <div class="focus-col">
+              <span class="focus-col-label">Bid-to-Cover</span>
+              <span class="focus-col-val num" id="focusBtcVal">--x</span>
+              <span class="focus-col-sub" id="focusBtcPct">-- percentile vs norm</span>
+            </div>
+
+            <div class="focus-col">
+              <span class="focus-col-label">Allotment Takedown</span>
+              <span class="focus-col-val num" id="focusTakedownSummary">Ind: --% · Dir: --% · Dlr: --%</span>
+              <div class="takedown-bar-stack" id="focusTakedownBar">
+                <div class="takedown-bar-seg indirect" style="width: 65%;"></div>
+                <div class="takedown-bar-seg direct" style="width: 20%;"></div>
+                <div class="takedown-bar-seg dealer" style="width: 15%;"></div>
+              </div>
+            </div>
+
+            <div class="focus-col">
+              <span class="focus-col-label">Dispersion & Tail</span>
+              <span class="focus-col-val num" id="focusStopVsMed">-- bp</span>
+              <span class="focus-col-sub" id="focusAllocHigh">--% alloc at high</span>
+            </div>
+
+            <div class="focus-action">
+              <button class="btn-ask-ai-card" id="btnAskAiTenor" data-ask-ai="Analyze the latest 10Y auction telemetry and demand shares in depth">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path></svg>
+                Ask AI Analyst
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Dual Analytical Previews (Side-by-side Curve & Demand) -->
+        <div class="overview-dual-grid">
+          <!-- Left: Yield Curve Quick Snapshot -->
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Yield Curve Snapshot</h2>
+                <span class="sub-note">Latest Clearing vs ~1 Mo Prior</span>
+              </div>
+              <div class="panel-quick-actions">
+                <button class="btn-link-tab" data-nav-target="curve">Explore Full Curve →</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="chart-container" style="height: 240px; position: relative;">
+                <canvas id="chartYieldCurve" aria-label="Treasury Yield Curve Chart" role="img"></canvas>
+              </div>
+            </div>
+          </article>
+
+          <!-- Right: Active Tenor Takedown Shares -->
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title" id="activeTenorTitle">10Y Demand Dynamics</h2>
+                <span class="sub-note" id="activeTenorBtcMean">Trailing Norm: --x BTC</span>
+              </div>
+              <div class="panel-quick-actions">
+                <button class="btn-link-tab" data-nav-target="demand">View Demand Deep Dive →</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="chart-container" style="height: 240px; position: relative;">
+                <canvas id="chartActiveTakedown" aria-label="Competitive Takedown Shares Bar Chart" role="img"></canvas>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- 4. Deterministic Executive Headlines -->
+        <section class="section-headline">
+          <div class="section-label">BENCHMARK INTELLIGENCE TELEMETRY</div>
+          <div class="headline-strip" id="headlineStrip" aria-live="polite">
+            <!-- Skeletons initially -->
+            <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
+            <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
+            <div class="headline-card skeleton-card"><div class="skeleton-line full"></div></div>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- =====================================================================
+           VIEW TAB 2: YIELD CURVE & BENCHMARK SPREADS
+           ===================================================================== -->
+      <section class="tab-content" id="tabCurve" role="tabpanel" aria-labelledby="navTabCurve">
+        <div class="curve-view-grid">
+          
+          <!-- Large Curve Chart -->
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">U.S. Treasury Term Structure</h2>
+                <span class="sub-note">Benchmark Nominal Yields (2Y through 30Y)</span>
+              </div>
+              <button class="btn-ask-ai-card" data-ask-ai="Is the US Treasury yield curve currently inverted? Explain the 2s10s spread and economic implications in depth.">
+                Ask AI about Curve
+              </button>
+            </div>
+            <div class="panel-body">
+              <div class="chart-container" style="height: 380px; position: relative;">
+                <canvas id="chartYieldCurveDetail" aria-label="Full Treasury Yield Curve Detail" role="img"></canvas>
+              </div>
+            </div>
+          </article>
+
+          <!-- Spreads Matrix & Regime Analysis -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <article class="panel">
+              <div class="panel-header">
+                <h2 class="panel-title">Benchmark Spreads Matrix</h2>
+                <span class="sub-note">Auction-Implied Basis Points</span>
+              </div>
+              <div class="panel-body" style="padding: 0;">
+                <table class="spreads-table" aria-label="Treasury Yield Curve Spreads">
+                  <thead>
+                    <tr>
+                      <th>Spread</th>
+                      <th>Value</th>
+                      <th>Short</th>
+                      <th>Long</th>
+                    </tr>
+                  </thead>
+                  <tbody id="spreadsTableBody">
+                    <tr><td><strong>2s5s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+                    <tr><td><strong>2s10s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+                    <tr><td><strong>5s10s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+                    <tr><td><strong>10s30s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <!-- Regime Insights Card -->
+            <div class="curve-insight-card">
+              <div class="ci-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Institutional Curve Insights
+              </div>
+              <p id="curveInsightText">
+                Monitoring the slope of the 2s10s and 10s30s spreads provides early warning signals of policy easing cycles, duration premium repricing, and structural issuance indigestion.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           VIEW TAB 3: DEMAND DYNAMICS & HEATMAP
+           ===================================================================== -->
+      <section class="tab-content" id="tabDemand" role="tabpanel" aria-labelledby="navTabDemand">
+        
+        <!-- Tenor Selector -->
+        <div class="demand-tenor-nav" id="demandTenorNav">
+          <span class="control-lbl">Select Benchmark:</span>
+          <div class="tenor-pills-bar" style="margin-bottom: 0;">
+            <button class="tenor-pill-btn" data-tenor="2Y"><span class="pill-tenor-code">2Y</span></button>
+            <button class="tenor-pill-btn" data-tenor="3Y"><span class="pill-tenor-code">3Y</span></button>
+            <button class="tenor-pill-btn" data-tenor="5Y"><span class="pill-tenor-code">5Y</span></button>
+            <button class="tenor-pill-btn" data-tenor="7Y"><span class="pill-tenor-code">7Y</span></button>
+            <button class="tenor-pill-btn is-active" data-tenor="10Y"><span class="pill-tenor-code">10Y</span></button>
+            <button class="tenor-pill-btn" data-tenor="20Y"><span class="pill-tenor-code">20Y</span></button>
+            <button class="tenor-pill-btn" data-tenor="30Y"><span class="pill-tenor-code">30Y</span></button>
+          </div>
+        </div>
+
+        <article class="panel" style="margin-top: 16px;">
+          <div class="panel-header">
+            <div class="ph-title-wrap">
+              <h2 class="panel-title" id="demandTabTitle">10Y Demand Dynamics & Heatmap</h2>
+              <span class="sub-note" id="demandTabBtcNorm">Trailing 20 Norm: --x BTC</span>
+            </div>
+            <button class="btn-ask-ai-card" id="btnAskAiDemandTab" data-ask-ai="Analyze the active tenor demand dynamics, dealer absorption, and quality grade.">
+              Ask AI to Diagnose Demand
+            </button>
+          </div>
+
+          <div class="panel-body">
+            <!-- Heatmap Strip -->
+            <div class="demand-heat-section">
+              <div class="sub-label">TRAILING AUCTIONS DEMAND HEATMAP (BTC & DEALER ABSORPTION)</div>
+              <div class="heat-strip-scroll">
+                <div class="heat-strip" id="activeTenorHeatStrip">
+                  <!-- Skeletons -->
+                  <div class="heat-cell skeleton-cell"></div>
+                  <div class="heat-cell skeleton-cell"></div>
+                  <div class="heat-cell skeleton-cell"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Takedown Bar Chart -->
+            <div class="chart-section" style="margin-top: 24px;">
+              <div class="sub-label">COMPETITIVE TAKEDOWN SHARES (% OF COMP_ACCEPTED)</div>
+              <div class="chart-container" style="height: 320px; position: relative;">
+                <canvas id="chartDemandFull" aria-label="Competitive Takedown Shares Bar Chart" role="img"></canvas>
+              </div>
+              <div class="legend-note">
+                <span><strong style="color: var(--ff-series-1);">■ Indirect:</strong> Foreign Central Banks & Global Inst.</span>
+                <span><strong style="color: var(--ff-series-3);">■ Direct:</strong> Domestic Non-Dealer Bidders</span>
+                <span><strong style="color: var(--ff-series-2);">■ Primary Dealer:</strong> Underwriter Residual Absorption</span>
               </div>
             </div>
           </div>
+        </article>
 
-          <!-- 100% Stacked Bar Chart -->
-          <div class="chart-section">
-            <div class="sub-label">COMPETITIVE TAKEDOWN SHARES (% OF COMP_ACCEPTED)</div>
-            <div class="chart-container" style="height: 220px; position: relative;">
-              <canvas id="chartActiveTakedown" aria-label="Competitive Takedown Shares Bar Chart" role="img"></canvas>
+      </section>
+
+      <!-- =====================================================================
+           VIEW TAB 4: HISTORICAL RESULTS LEDGER
+           ===================================================================== -->
+      <section class="tab-content" id="tabLedger" role="tabpanel" aria-labelledby="navTabLedger">
+        
+        <div class="ledger-header">
+          <div class="lh-left">
+            <h2 class="ledger-title">AUCTION RESULTS DATABASE</h2>
+            <span class="ledger-count num" id="ledgerCount">-- Auctions</span>
+          </div>
+
+          <div class="ledger-controls">
+            <div class="control-group">
+              <label for="ledgerSearchInput" class="sr-only">Search</label>
+              <input type="text" id="ledgerSearchInput" class="ledger-search" placeholder="Search CUSIP, date, tenor..." autocomplete="off">
             </div>
-            <div class="legend-note">
-              <span><strong style="color: #2563eb;">■ Indirect:</strong> Foreign Central Banks & Global Inst.</span>
-              <span><strong style="color: #0d9488;">■ Direct:</strong> Domestic Non-Dealer Bidders</span>
-              <span><strong style="color: #ea580c;">■ Primary Dealer:</strong> Underwriter Residual Absorption</span>
+
+            <div class="control-group">
+              <label for="ledgerTenorSelect" class="control-lbl">Tenor:</label>
+              <select id="ledgerTenorSelect" class="ledger-select">
+                <option value="ALL">All Tenors</option>
+                <option value="2Y">2-Year</option>
+                <option value="3Y">3-Year</option>
+                <option value="5Y">5-Year</option>
+                <option value="7Y">7-Year</option>
+                <option value="10Y">10-Year</option>
+                <option value="20Y">20-Year</option>
+                <option value="30Y">30-Year</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="ledgerReopenSelect" class="control-lbl">Issue:</label>
+              <select id="ledgerReopenSelect" class="ledger-select">
+                <option value="ALL">All Issues</option>
+                <option value="NEW">New Issues</option>
+                <option value="REOPEN">Reopenings</option>
+              </select>
             </div>
           </div>
         </div>
-      </article>
 
-      <!-- CENTER: Yield Curve Snapshot & Spreads -->
-      <article class="panel panel-curve">
-        <div class="panel-header">
-          <h2 class="panel-title">Yield Curve Snapshot</h2>
-          <span class="sub-note">Latest Clearing vs ~1 Mo Prior</span>
+        <div class="table-container">
+          <table class="ledger-table" id="ledgerTable" aria-label="Auction Historical Results Table">
+            <thead>
+              <tr>
+                <th scope="col">Auction Date</th>
+                <th scope="col">Tenor</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="text-right">High Yield</th>
+                <th scope="col" class="text-right" title="Change in cut-off high yield vs prior auction of same tenor">Δ bp</th>
+                <th scope="col" class="text-right" title="Total tendered bids divided by total accepted bids">Bid-to-Cover</th>
+                <th scope="col" class="text-right" title="Foreign central banks & global institutional takedown">Indirect %</th>
+                <th scope="col" class="text-right" title="Primary Dealer residual absorption">Dealer %</th>
+                <th scope="col" class="text-right" title="High yield minus average/median yield in basis points">Stop vs Med</th>
+                <th scope="col" class="text-right" title="Percentage of bids awarded at the cut-off yield">Allot. High</th>
+                <th scope="col" class="text-right">Offering Size</th>
+                <th scope="col">Settles</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+              <!-- Skeletons -->
+              <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
+              <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
+              <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="panel-body">
-          <div class="chart-container" style="height: 190px; position: relative;">
-            <canvas id="chartYieldCurve" aria-label="Treasury Yield Curve Chart" role="img"></canvas>
-          </div>
-
-          <!-- Benchmark Spreads Table -->
-          <div class="spreads-section">
-            <div class="sub-label">AUCTION-IMPLIED SPREADS (DATES DIFFER)</div>
-            <table class="spreads-table" aria-label="Treasury Yield Curve Spreads">
-              <thead>
-                <tr>
-                  <th>Spread</th>
-                  <th>Value</th>
-                  <th>Short Tenor</th>
-                  <th>Long Tenor</th>
-                </tr>
-              </thead>
-              <tbody id="spreadsTableBody">
-                <tr><td><strong>2s5s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-                <tr><td><strong>2s10s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-                <tr><td><strong>5s10s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-                <tr><td><strong>10s30s</strong></td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </article>
-
-      <!-- RIGHT: Upcoming 14 Days Timeline -->
-      <aside class="panel panel-upcoming">
-        <div class="panel-header">
-          <h2 class="panel-title">Upcoming Schedule</h2>
-          <span class="sub-note">Next 14 Days</span>
+        <div class="ledger-pagination" id="ledgerPagination">
+          <!-- Rendered dynamically -->
         </div>
 
-        <div class="panel-body">
-          <div class="upcoming-timeline" id="upcomingTimelineList" role="feed" aria-label="Upcoming auctions timeline">
-            <!-- Skeletons -->
-            <div class="upcoming-item skeleton-item"><div class="skeleton-line half"></div><div class="skeleton-line full"></div></div>
-            <div class="upcoming-item skeleton-item"><div class="skeleton-line half"></div><div class="skeleton-line full"></div></div>
-            <div class="upcoming-item skeleton-item"><div class="skeleton-line half"></div><div class="skeleton-line full"></div></div>
+      </section>
+
+      <!-- =====================================================================
+           VIEW TAB 5: UPCOMING AUCTIONS SCHEDULE
+           ===================================================================== -->
+      <section class="tab-content" id="tabUpcoming" role="tabpanel" aria-labelledby="navTabUpcoming">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Treasury Benchmark Issuance Calendar</h2>
+              <span class="sub-note">Next 14 Days Nominal Notes & Bonds Schedule</span>
+            </div>
+            <button class="btn-ask-ai-card" data-ask-ai="What upcoming Treasury auctions are scheduled for this week and what are the offering sizes?">
+              Ask AI about Upcoming Supply
+            </button>
+          </div>
+          <div class="panel-body">
+            <div class="upcoming-timeline" id="upcomingTimelineList" role="feed" aria-label="Upcoming auctions timeline">
+              <!-- Skeletons -->
+              <div class="upcoming-item skeleton-item"><div class="skeleton-line half"></div><div class="skeleton-line full"></div></div>
+              <div class="upcoming-item skeleton-item"><div class="skeleton-line half"></div><div class="skeleton-line full"></div></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- =====================================================================
+           VIEW TAB 6: DEDICATED AI ANALYST STUDIO
+           ===================================================================== -->
+      <section class="tab-content" id="tabChat" role="tabpanel" aria-labelledby="navTabChat">
+        <div class="full-chat-studio">
+          <div class="chat-header">
+            <div class="chat-title-group">
+              <div class="chat-bot-icon">AI</div>
+              <div class="chat-title-text">
+                <span class="chat-title">Futures First Institutional Analyst</span>
+                <span class="chat-subtitle">Directly connected to live Fiscal Data telemetry</span>
+              </div>
+            </div>
+            <div class="chat-header-actions">
+              <button class="btn-chat-tool" id="fullChatClearBtn" title="Clear Chat History">Clear Conversation</button>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="chat-messages-container" id="fullChatMessages">
+            <!-- Messages rendered by chatbot.js -->
+          </div>
+
+          <!-- Suggestion Chips -->
+          <div class="chat-chips-scroll" id="fullChatPromptChips">
+            <button class="chat-chip" data-prompt="Analyze the latest 10Y auction quality and demand shares in depth">📊 Analyze 10Y Auction</button>
+            <button class="chat-chip" data-prompt="Is the 2s10s yield curve inverted right now? What are the economic implications?">📈 Is 2s10s Inverted?</button>
+            <button class="chat-chip" data-prompt="Explain Bid-to-Cover ratio and how percentiles are determined">🎯 What is Bid-to-Cover?</button>
+            <button class="chat-chip" data-prompt="Explain Indirect Bidders vs Direct Bidders vs Primary Dealers">👥 Allotment Breakdown</button>
+            <button class="chat-chip" data-prompt="What does an auction tail and stop vs median dispersion mean?">⏱️ Explain Dealer Tails</button>
+            <button class="chat-chip" data-prompt="Give me an executive demand summary across all benchmarks">📋 Cross-Benchmark Summary</button>
+            <button class="chat-chip" data-prompt="What auctions are coming up next?">📅 Upcoming Supply</button>
+          </div>
+
+          <!-- Input Bar -->
+          <div class="chat-input-bar">
+            <input type="text" class="chat-input" id="fullChatInput" placeholder="Ask any question about bond auctions, curve inversion, dealer tails, or benchmark data..." autocomplete="off">
+            <button class="btn-chat-send" id="fullChatSendBtn">
+              <span>Send</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
           </div>
         </div>
-      </aside>
+      </section>
 
-    </section>
+    </main>
 
-    <!-- 4. BELOW THE FOLD: Searchable Results Ledger -->
-    <section class="section-ledger">
-      <div class="ledger-header">
-        <div class="lh-left">
-          <h2 class="ledger-title">AUCTION RESULTS LEDGER</h2>
-          <span class="ledger-count num" id="ledgerCount">-- Auctions</span>
-        </div>
+  </div>
 
-        <div class="ledger-controls">
-          <div class="control-group">
-            <label for="ledgerSearchInput" class="sr-only">Search</label>
-            <input type="text" id="ledgerSearchInput" class="ledger-search" placeholder="Search CUSIP, date, tenor..." autocomplete="off">
-          </div>
-
-          <div class="control-group">
-            <label for="ledgerTenorSelect" class="control-lbl">Tenor:</label>
-            <select id="ledgerTenorSelect" class="ledger-select">
-              <option value="ALL">All Tenors</option>
-              <option value="2Y">2-Year</option>
-              <option value="3Y">3-Year</option>
-              <option value="5Y">5-Year</option>
-              <option value="7Y">7-Year</option>
-              <option value="10Y">10-Year</option>
-              <option value="20Y">20-Year</option>
-              <option value="30Y">30-Year</option>
-            </select>
-          </div>
-
-          <div class="control-group">
-            <label for="ledgerReopenSelect" class="control-lbl">Issue:</label>
-            <select id="ledgerReopenSelect" class="ledger-select">
-              <option value="ALL">All Issues</option>
-              <option value="NEW">New Issues</option>
-              <option value="REOPEN">Reopenings</option>
-            </select>
-          </div>
+  <!-- =========================================================================
+       3. FLOATING AI CHATBOT WIDGET (Available Everywhere)
+       ========================================================================= -->
+  <aside class="chat-widget" id="chatWidget" role="dialog" aria-modal="true" aria-labelledby="chatWidgetTitle">
+    <div class="chat-header">
+      <div class="chat-title-group">
+        <div class="chat-bot-icon">AI</div>
+        <div class="chat-title-text">
+          <span class="chat-title" id="chatWidgetTitle">Treasury AI Analyst</span>
+          <span class="chat-subtitle">Institutional Telemetry Explainer</span>
         </div>
       </div>
-
-      <div class="table-container">
-        <table class="ledger-table" id="ledgerTable" aria-label="Auction Historical Results Table">
-          <thead>
-            <tr>
-              <th scope="col">Auction Date</th>
-              <th scope="col">Tenor</th>
-              <th scope="col">Type</th>
-              <th scope="col" class="text-right">High Yield</th>
-              <th scope="col" class="text-right" title="Change in cut-off high yield vs the prior auction of the same tenor (1 bp = 0.01%)">Δ bp <span class="th-info">ℹ</span></th>
-              <th scope="col" class="text-right" title="Total tendered bids divided by total accepted bids. Higher indicates stronger demand.">Bid-to-Cover <span class="th-info">ℹ</span></th>
-              <th scope="col" class="text-right" title="Indirect bidder percentage of competitive accepted bids (foreign central banks & global institutions)">Indirect % <span class="th-info">ℹ</span></th>
-              <th scope="col" class="text-right" title="Primary Dealer percentage of competitive accepted bids. Lower dealer share indicates higher end-investor absorption.">Dealer % <span class="th-info">ℹ</span></th>
-              <th scope="col" class="text-right" title="Clearing high yield minus average/median yield in basis points. Measures cut-off dispersion.">Stop vs Median <span class="th-info">ℹ</span></th>
-              <th scope="col" class="text-right" title="Percentage of bids awarded at the cut-off / high yield">Allot. @ High</th>
-              <th scope="col" class="text-right">Offering Size</th>
-              <th scope="col">Settles</th>
-            </tr>
-          </thead>
-          <tbody id="ledgerTableBody">
-            <!-- Skeletons -->
-            <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
-            <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
-            <tr><td colspan="12"><div class="skeleton-line full"></div></td></tr>
-          </tbody>
-        </table>
+      <div class="chat-header-actions">
+        <button class="btn-chat-tool" id="chatClearBtn" title="Clear Chat History">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+        <button class="btn-chat-tool" id="chatCloseBtn" aria-label="Close Chat">✕</button>
       </div>
+    </div>
 
-      <div class="ledger-pagination" id="ledgerPagination">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
+    <!-- Messages Container -->
+    <div class="chat-messages-container" id="chatMessages">
+      <!-- Populated by chatbot.js -->
+    </div>
 
-  </main>
+    <!-- Prompt Chips -->
+    <div class="chat-chips-scroll" id="chatPromptChips">
+      <button class="chat-chip" data-prompt="Analyze the latest 10Y auction quality and demand shares in depth">📊 Analyze 10Y</button>
+      <button class="chat-chip" data-prompt="Is the 2s10s yield curve inverted?">📈 2s10s Curve</button>
+      <button class="chat-chip" data-prompt="Explain Bid-to-Cover ratio">🎯 Bid-to-Cover</button>
+      <button class="chat-chip" data-prompt="Explain Indirect vs Primary Dealer takedown">👥 Takedown Shares</button>
+      <button class="chat-chip" data-prompt="What does an auction tail mean?">⏱️ Auction Tails</button>
+      <button class="chat-chip" data-prompt="What auctions are coming up next?">📅 Upcoming Supply</button>
+    </div>
 
-  <!-- INSPECTOR SIDE DRAWER -->
+    <!-- Input Bar -->
+    <div class="chat-input-bar">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Ask about Treasury auctions, data, or curves..." autocomplete="off">
+      <button class="btn-chat-send" id="chatSendBtn" aria-label="Send message">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Floating Chat Toggle Trigger -->
+  <button class="chat-floating-btn" id="chatFloatingBtn" aria-label="Open AI Auction Analyst">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path></svg>
+    <span>Ask AI Analyst</span>
+  </button>
+
+  <!-- =========================================================================
+       4. INSPECTOR SIDE DRAWER (When a Ledger row is selected)
+       ========================================================================= -->
   <aside class="inspector-drawer" id="inspectorDrawer" role="dialog" aria-modal="true" aria-labelledby="inspTitle">
     <div class="drawer-header">
       <div class="dh-title-wrap">
@@ -361,6 +778,13 @@
         </div>
       </div>
 
+      <!-- Action: Ask AI about this security -->
+      <div class="drawer-section">
+        <button class="btn-ask-ai-card" style="width: 100%; justify-content: center; padding: 10px;" id="btnInspAskAi">
+          Ask AI Analyst to Explain this Auction
+        </button>
+      </div>
+
       <!-- Official Treasury PDF Documentation -->
       <div class="drawer-section">
         <h4 class="ds-title">OFFICIAL TREASURY PRESS RELEASES</h4>
@@ -375,7 +799,9 @@
   </aside>
   <div class="drawer-backdrop" id="inspectorBackdrop"></div>
 
-  <!-- API QUICK GUIDE MODAL -->
+  <!-- =========================================================================
+       5. API GUIDE MODAL
+       ========================================================================= -->
   <div class="modal-dialog" id="apiGuideModal" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
     <div class="modal-content">
       <div class="modal-header">
@@ -394,11 +820,11 @@
         <h4>3. cURL Request</h4>
         <pre><code>curl -H "Accept: application/json" "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[size]=1"</code></pre>
 
-        <h4>4. Field Definitions</h4>
+        <h4>4. Key Analytical Metrics</h4>
         <ul>
-          <li><strong>comp_accepted:</strong> Total competitive bids accepted. Denominator for indirect, direct, and dealer takedown shares.</li>
-          <li><strong>allocation_pctage:</strong> Percentage of bids accepted at the cut-off / high yield.</li>
-          <li><strong>Stop vs median (bp):</strong> Dispersion between high yield and median yield: <code>(high_yield - avg_med_yield) * 100</code>.</li>
+          <li><strong>comp_accepted:</strong> Denominator for indirect, direct, and dealer takedown shares.</li>
+          <li><strong>allocation_pctage:</strong> Allocation percentage at the cut-off / high yield.</li>
+          <li><strong>Stop vs Median:</strong> High yield minus median yield in basis points: <code>(high_yield - avg_med_yield) * 100</code>.</li>
         </ul>
       </div>
     </div>

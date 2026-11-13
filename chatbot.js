@@ -5,7 +5,7 @@
  */
 
 import { state } from './state.js';
-import { getTenorCode, parseNum } from './analytics.js';
+import { getTenorCode, parseNum, calculateTakedownShares, calculateStopVsMedianBps, getAllocationAtHighPct } from './analytics.js';
 
 export class AuctionChatbot {
   constructor() {
@@ -258,6 +258,16 @@ Try asking about:
    */
   generateResponse(query) {
     const q = query.toLowerCase();
+
+    // 0. Direct CUSIP Lookup (e.g. "91282CRX1")
+    const cusipMatch = query.match(/\b([0-9]{3}[0-9a-zA-Z]{5}[0-9a-zA-Z])\b/i);
+    if (cusipMatch) {
+      const targetCusip = cusipMatch[1].toUpperCase();
+      const match = state.nominalAuctions?.find(a => String(a.cusip || '').toUpperCase() === targetCusip);
+      if (match) {
+        return this.explainAuctionByRow(match);
+      }
+    }
 
     // 1. Tenor-specific queries (e.g. "10Y", "2-year", "30Y bond", "5Y")
     const tenorMatch = q.match(/\b(2y|3y|5y|7y|10y|20y|30y)\b/i) ||
@@ -538,6 +548,40 @@ This monitor is engineered to deliver institutional-grade clarity without visual
 4. **📋 Historical Results Ledger:** Complete searchable database of Treasury Note & Bond auctions with CUSIP search, tenor filters, and side-drawer telemetry.
 5. **📅 Upcoming Calendar:** 14-day schedule of future Treasury auctions with live ET countdowns.
 6. **💬 AI Analyst (This Chatbot):** Ask any question about bond auctions, curve inversion, dealer tails, or specific tenors!`;
+  }
+
+  explainAuctionByRow(a) {
+    const code = getTenorCode(a) || a.security_term;
+    const isReopen = String(a.reopening || '').toLowerCase() === 'yes';
+    const highYield = parseNum(a.high_yield);
+    const avgYield = parseNum(a.avg_med_yield);
+    const btc = parseNum(a.bid_to_cover_ratio);
+    const offeringAmt = parseNum(a.offering_amt);
+    const stopVsMed = calculateStopVsMedianBps(a);
+    const allocHigh = getAllocationAtHighPct(a);
+    const shares = calculateTakedownShares(a);
+    const coupon = parseNum(a.int_rate);
+    const price = parseNum(a.price_per100);
+
+    return `### 🏛️ Treasury Security Telemetry: ${code} (CUSIP: \`${a.cusip}\`)
+
+**Auction Date:** ${a.auction_date} | **Settles:** ${a.issue_date || '—'}
+**Issue Type:** ${isReopen ? 'Reopening' : 'New Issue'} | **Offering Size:** $${offeringAmt ? (offeringAmt / 1e9).toFixed(2) : '—'}B
+
+#### 1. Pricing & Cut-off
+- **Clearing High Yield:** \`${highYield !== null ? highYield.toFixed(3) : '—'}%\`
+- **Median Yield:** \`${avgYield !== null ? avgYield.toFixed(3) : '—'}%\`
+- **Stop vs Median Dispersion:** \`${stopVsMed !== null ? stopVsMed.toFixed(1) : '—'} bp\`
+- **Allocation at High:** \`${allocHigh !== null ? allocHigh.toFixed(1) : '—'}%\`
+- **Coupon:** \`${coupon !== null ? coupon.toFixed(3) : '—'}%\` | **Price:** \`${price !== null ? price.toFixed(3) : '—'}\`
+
+#### 2. Demand & Takedown Allotment
+- **Bid-to-Cover Ratio:** \`${btc !== null ? btc.toFixed(2) : '—'}x\`
+- **Indirect Bidders (Foreign / Inst):** \`${shares.indirectPct !== null ? shares.indirectPct.toFixed(1) : '—'}%\`
+- **Direct Bidders (Domestic Funds):** \`${shares.directPct !== null ? shares.directPct.toFixed(1) : '—'}%\`
+- **Primary Dealers (Underwriter Absorption):** \`${shares.dealerPct !== null ? shares.dealerPct.toFixed(1) : '—'}%\`
+
+${shares.dealerPct < 15 ? '✓ **Low dealer absorption** indicates healthy organic appetite from direct and indirect accounts.' : '⚠️ **Elevated dealer take** indicates softer end-user demand.'}`;
   }
 
   explainSelectedAuction() {

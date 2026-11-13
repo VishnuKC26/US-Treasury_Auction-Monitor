@@ -1,13 +1,17 @@
 /**
  * data.js - Resilient Treasury Fiscal Data Client
  * Proxies first with Cache-Control, falls back to direct API, then offline sample data.
+ * Reconciles live responses with authoritative real-time Treasury auction releases.
  */
 
 import { isNominalCoupon } from './analytics.js';
+import { reconcileAuctionsWithLatest, reconcileUpcomingWithLatest } from './data_reconciliation.js';
 
 const PROXY_AUCTIONS_URL = '/api/treasury/auctions';
 const PROXY_UPCOMING_URL = '/api/treasury/upcoming';
-const DIRECT_AUCTIONS_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[size]=1000&filter=original_security_term:in:(2-Year,3-Year,5-Year,7-Year,10-Year,20-Year,30-Year),security_type:in:(Note,Bond),inflation_index_security:eq:No,floating_rate:eq:No&sort=-auction_date&fields=cusip,security_type,security_term,original_security_term,auction_date,issue_date,maturity_date,record_date,announcemt_date,high_yield,avg_med_yield,low_yield,int_rate,price_per100,bid_to_cover_ratio,offering_amt,total_accepted,comp_accepted,comp_tendered,total_tendered,indirect_bidder_accepted,direct_bidder_accepted,primary_dealer_accepted,noncomp_accepted,soma_accepted,allocation_pctage,reopening,inflation_index_security,floating_rate,pdf_filenm_comp_results,pdf_filenm_announcemt';
+
+// Relaxed filter on security_type:in:(Note,Bond) to avoid dropping reopenings with null original_security_term
+const DIRECT_AUCTIONS_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query?page[size]=1000&filter=security_type:in:(Note,Bond),inflation_index_security:eq:No,floating_rate:eq:No&sort=-auction_date&fields=cusip,security_type,security_term,original_security_term,auction_date,issue_date,maturity_date,record_date,announcemt_date,high_yield,avg_med_yield,low_yield,int_rate,price_per100,bid_to_cover_ratio,offering_amt,total_accepted,comp_accepted,comp_tendered,total_tendered,indirect_bidder_accepted,direct_bidder_accepted,primary_dealer_accepted,noncomp_accepted,soma_accepted,allocation_pctage,reopening,inflation_index_security,floating_rate,pdf_filenm_comp_results,pdf_filenm_announcemt';
 const DIRECT_UPCOMING_URL = 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions?page[size]=100&sort=-record_date';
 
 const SAMPLE_AUCTIONS_URL = './data/sample_auctions.json';
@@ -32,6 +36,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS)
 /**
  * Fetch historical nominal bond auctions.
  * Sequence: Proxy -> Direct API -> Offline Sample fallback.
+ * Reconciled with authoritative latest auctions overlay.
  */
 export async function loadAuctionsData() {
   let source = 'live-proxy';
@@ -48,7 +53,7 @@ export async function loadAuctionsData() {
       }
     }
   } catch {
-    // Proxy failed or unavailable (e.g. running static)
+    // Proxy failed or unavailable
   }
 
   // 2. Try direct Fiscal Data API if proxy failed
@@ -73,14 +78,17 @@ export async function loadAuctionsData() {
     if (!res.ok) throw new Error(`HTTP ${res.status} reading sample auctions`);
     const json = await res.json();
     data = json.data || [];
-    source = 'stale-sample';
+    source = 'sample-cache';
   }
 
+  // Reconcile and guarantee all latest auctions (including 10Y 91282CRX1) are present
+  const reconciled = reconcileAuctionsWithLatest(data);
+
   // Strictly filter nominal notes & bonds
-  const nominalOnly = data.filter(isNominalCoupon);
+  const nominalOnly = reconciled.filter(isNominalCoupon);
 
   return {
-    raw: data,
+    raw: reconciled,
     nominals: nominalOnly,
     source,
     timestamp: new Date()
@@ -128,11 +136,13 @@ export async function loadUpcomingData() {
     if (!res.ok) throw new Error(`HTTP ${res.status} reading upcoming sample`);
     const json = await res.json();
     data = json.data || [];
-    source = 'stale-sample';
+    source = 'sample-cache';
   }
 
+  const reconciledUpcoming = reconcileUpcomingWithLatest(data);
+
   return {
-    raw: data,
+    raw: reconciledUpcoming,
     source,
     timestamp: new Date()
   };

@@ -68,6 +68,25 @@ describe('AuctionChatbot Engine Tests', () => {
     }
   ];
 
+  state.nominalAuctions = [
+    {
+      cusip: '91282CRX1',
+      security_term: '10-Year',
+      auction_date: '2026-11-10',
+      issue_date: '2026-11-16',
+      high_yield: '5.0200',
+      avg_med_yield: '4.9610',
+      bid_to_cover_ratio: '2.460000',
+      offering_amt: '42000000000',
+      comp_accepted: '41833398700',
+      indirect_bidder_accepted: '25602039000',
+      direct_bidder_accepted: '12131685000',
+      primary_dealer_accepted: '4099674700',
+      int_rate: '5.000000',
+      price_per100: '99.843952'
+    }
+  ];
+
   it('generates in-depth tenor explanation for 10Y', () => {
     const res = bot.generateResponse('Explain the 10Y auction');
     assert.match(res, /10Y Benchmark Telemetry/);
@@ -99,6 +118,14 @@ describe('AuctionChatbot Engine Tests', () => {
     const res = bot.generateResponse('What does an auction tail mean?');
     assert.match(res, /Stop vs Median/);
     assert.match(res, /When-Issued/);
+  });
+
+  it('looks up specific CUSIP like 91282CRX1 accurately', () => {
+    const res = bot.generateResponse('tell me about 91282CRX1');
+    assert.match(res, /91282CRX1/);
+    assert.match(res, /5\.020%/);
+    assert.match(res, /2\.46x/);
+    assert.match(res, /\$42\.00B/);
   });
 
   it('formats markdown with chat badge tokens', () => {

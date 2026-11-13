@@ -1,3 +1,5 @@
+import { reconcileUpcomingWithLatest } from '../../data_reconciliation.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -27,15 +29,23 @@ export default async function handler(req, res) {
       }
     });
 
-    const data = await upstream.text();
+    if (!upstream.ok) {
+      throw new Error(`Upstream returned ${upstream.status}`);
+    }
+
+    const json = await upstream.json();
+    const reconciled = reconcileUpcomingWithLatest(json.data || []);
+
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
     res.setHeader('X-Data-Source', 'live-api');
-    res.statusCode = upstream.status;
-    res.end(data);
+    res.statusCode = 200;
+    res.end(JSON.stringify({ data: reconciled, meta: json.meta }));
   } catch (err) {
-    res.statusCode = 502;
+    const reconciled = reconcileUpcomingWithLatest([]);
+    res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: `Live Upcoming API unreachable: ${err.message}` }));
+    res.setHeader('X-Data-Source', 'reconciled-fallback');
+    res.end(JSON.stringify({ data: reconciled, meta: { count: reconciled.length } }));
   }
 };

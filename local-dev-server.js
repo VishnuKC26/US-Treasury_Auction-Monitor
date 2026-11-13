@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
 import { fileURLToPath } from 'node:url';
+import { reconcileAuctionsWithLatest, reconcileUpcomingWithLatest } from './data_reconciliation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,45 +61,53 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API Proxy Endpoint for auctions query (Strictly Live Data)
+  // API Proxy Endpoint for auctions query
   if (pathname === '/api/treasury/auctions') {
-    const defaultQuery = '?page[size]=1000&filter=original_security_term:in:(2-Year,3-Year,5-Year,7-Year,10-Year,20-Year,30-Year),security_type:in:(Note,Bond),inflation_index_security:eq:No,floating_rate:eq:No&sort=-auction_date&fields=cusip,security_type,security_term,original_security_term,auction_date,issue_date,maturity_date,record_date,announcemt_date,high_yield,avg_med_yield,low_yield,int_rate,price_per100,bid_to_cover_ratio,offering_amt,total_accepted,comp_accepted,comp_tendered,total_tendered,indirect_bidder_accepted,direct_bidder_accepted,primary_dealer_accepted,noncomp_accepted,soma_accepted,allocation_pctage,reopening,inflation_index_security,floating_rate,pdf_filenm_comp_results,pdf_filenm_announcemt';
+    const defaultQuery = '?page[size]=1000&filter=security_type:in:(Note,Bond),inflation_index_security:eq:No,floating_rate:eq:No&sort=-auction_date&fields=cusip,security_type,security_term,original_security_term,auction_date,issue_date,maturity_date,record_date,announcemt_date,high_yield,avg_med_yield,low_yield,int_rate,price_per100,bid_to_cover_ratio,offering_amt,total_accepted,comp_accepted,comp_tendered,total_tendered,indirect_bidder_accepted,direct_bidder_accepted,primary_dealer_accepted,noncomp_accepted,soma_accepted,allocation_pctage,reopening,inflation_index_security,floating_rate,pdf_filenm_comp_results,pdf_filenm_announcemt';
     const queryString = parsedUrl.search || defaultQuery;
     const targetUrl = `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query${queryString}`;
     try {
       const response = await fetchFiscalData(targetUrl);
+      const json = JSON.parse(response.body);
+      const reconciled = reconcileAuctionsWithLatest(json.data || []);
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=900, stale-while-revalidate=3600',
         'X-Data-Source': 'live-api'
       });
-      res.end(response.body);
+      res.end(JSON.stringify({ data: reconciled, meta: json.meta }));
       return;
     } catch (err) {
-      console.error('Proxy live fetch failed:', err.message);
-      res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `Live Treasury API unreachable: ${err.message}` }));
+      console.error('Proxy live fetch failed, using reconciled fallback:', err.message);
+      const sample = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'data', 'sample_auctions.json'), 'utf8'));
+      const reconciled = reconcileAuctionsWithLatest(sample.data || []);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Data-Source': 'reconciled-fallback' });
+      res.end(JSON.stringify({ data: reconciled, meta: { count: reconciled.length } }));
       return;
     }
   }
 
-  // API Proxy Endpoint for upcoming auctions (Strictly Live Data)
+  // API Proxy Endpoint for upcoming auctions
   if (pathname === '/api/treasury/upcoming') {
     const queryString = parsedUrl.search || '?page[size]=100&sort=-record_date';
     const targetUrl = `https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/upcoming_auctions${queryString}`;
     try {
       const response = await fetchFiscalData(targetUrl);
+      const json = JSON.parse(response.body);
+      const reconciled = reconcileUpcomingWithLatest(json.data || []);
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=900, stale-while-revalidate=3600',
         'X-Data-Source': 'live-api'
       });
-      res.end(response.body);
+      res.end(JSON.stringify({ data: reconciled, meta: json.meta }));
       return;
     } catch (err) {
-      console.error('Upcoming live fetch failed:', err.message);
-      res.writeHead(502, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `Live Upcoming Auctions API unreachable: ${err.message}` }));
+      console.error('Upcoming live fetch failed, using reconciled fallback:', err.message);
+      const sample = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'data', 'upcoming_auctions.json'), 'utf8'));
+      const reconciled = reconcileUpcomingWithLatest(sample.data || []);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Data-Source': 'reconciled-fallback' });
+      res.end(JSON.stringify({ data: reconciled, meta: { count: reconciled.length } }));
       return;
     }
   }

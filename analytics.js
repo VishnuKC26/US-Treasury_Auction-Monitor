@@ -305,6 +305,7 @@ export function computeTenorStats(auctionsForTenor, tenorCode, trailingWindow = 
     indirectPct: latestShares.indirectPct,
     directPct: latestShares.directPct,
     dealerPct: latestShares.dealerPct,
+    shares: latestShares,
     trailingMedianDealerPct,
     trailingMeanIndirectPct,
     dealerVsMedianDelta,
@@ -443,4 +444,88 @@ function formatShortDate(dateStr) {
     return `${months[mIdx] || parts[1]} ${parseInt(parts[2], 10)}`;
   }
   return dateStr;
+}
+
+/**
+ * Strict topic validator for the Treasury Auctions AI Analyst.
+ * Ensures the assistant only answers questions directly relevant to U.S. Treasury
+ * auctions, yield curve dynamics, debt capital markets, and dashboard telemetry.
+ */
+export function isProjectTopic(query) {
+  if (!query || typeof query !== 'string') return false;
+  const q = query.toLowerCase().trim();
+
+  // 1. Direct CUSIP match (e.g. 91282CRX1)
+  if (/\b[0-9]{3}[0-9a-zA-Z]{5}[0-9a-zA-Z]\b/.test(q)) return true;
+
+  // 2. Explicit off-topic categories
+  const offTopicPatterns = [
+    /\b(recipe|cook|bake|cake|food|ingredient|dinner|lunch|breakfast|delicious)\b/,
+    /\b(weather|forecast|rain|temperature|climate|snow)\b/,
+    /\b(movie|cinema|actor|actress|film|hollywood|bollywood|netflix|director)\b/,
+    /\b(song|music|lyrics|band|album|singer|spotify|guitar|piano)\b/,
+    /\b(game|gaming|playstation|xbox|nintendo|fortnite|minecraft|pokemon)\b/,
+    /\b(sport|sports|football|soccer|basketball|cricket|tennis|nba|nfl|fifa|olympics|super bowl|world cup)\b/,
+    /\b(poem|poetry|rhyme|story|novel|fiction|essay|haiku|homework|assignment|exam|quiz|chemistry|biology|physics)\b/,
+    /\b(joke|riddle|funny|humor|pun|laugh)\b/,
+    /\b(python|javascript|typescript|c\+\+|java\b|html|css|php|rust|golang|code a|write code|script to|regex to|program that|sql query)\b/,
+    /\b(capital of|president of|who is the king|population of|distance between|tallest mountain|who is the ceo)\b/,
+    /\b(crypto|bitcoin|ethereum|doge|solana|nft|blockchain|altcoin|binance|coinbase)\b/,
+    /\b(horoscope|zodiac|astrology|dating|love|relationship|medical advice|symptom|doctor|medicine|cure)\b/,
+    /\b(translate|translation|spanish|french|german|chinese|japanese)\b/
+  ];
+
+  const hasTreasuryContext = /\b(treasury|treasuries|bond|bonds|auction|auctions|yield curve|bid to cover|bid-to-cover|takedown|primary dealer|2s10s|10s30s|2s5s|5s10s|cusip)\b/.test(q);
+
+  for (const pat of offTopicPatterns) {
+    if (pat.test(q) && !hasTreasuryContext) {
+      return false;
+    }
+  }
+
+  // Dashboard general help & terminal capability prompts
+  if (q === 'help' || q === 'guide' || q.includes('how to use') || q.includes('what can you do') || q.includes('who are you') || q.includes('dashboard guide')) {
+    return true;
+  }
+
+  // 3. Domain keywords & concepts
+  const domainKeywords = [
+    // Benchmark Tenors
+    '2y', '3y', '5y', '7y', '10y', '20y', '30y',
+    '2-year', '3-year', '5-year', '7-year', '10-year', '20-year', '30-year',
+    '2 year', '3 year', '5 year', '7 year', '10 year', '20 year', '30 year',
+    'note', 'notes', 'bond', 'bonds', 'bill', 'bills', 'treasury', 'treasuries', 'ust', 'sovereign debt',
+    // Auction Mechanics & Allocations
+    'auction', 'auctions', 'bid', 'bids', 'tender', 'tendered', 'accepted',
+    'bid to cover', 'bid-to-cover', 'btc', 'coverage',
+    'tail', 'tails', 'tailing', 'stop-out', 'stop out', 'stop', 'high yield', 'clearing yield', 'cut off', 'cutoff',
+    'stop vs median', 'stop-vs-median', 'dispersion', 'allocation at high', 'allocation',
+    'takedown', 'allotment', 'indirect', 'direct', 'primary dealer', 'primary dealers', 'dealer', 'dealers', 'overhang',
+    'soma', 'reopening', 'reopen', 'new issue', 'coupon', 'int_rate', 'price_per100', 'offering', 'issuance',
+    // Yield Curve & Term Structure
+    'yield', 'yields', 'spread', 'spreads', 'curve', 'yield curve',
+    '2s10s', '10s30s', '2s5s', '5s10s', '2s30s', 'slope', 'invert', 'inverted', 'inversion',
+    'steepen', 'steepening', 'flatten', 'flattening', 'term premium', 'duration', 'dv01', 'convexity', 'basis point', 'bp', 'bps',
+    // Dashboard, Schedule & Fiscal Data
+    'calendar', 'upcoming', 'schedule', 'fiscal data', 'fiscaldata', 'ledger', 'drawer', 'heatmap',
+    'summary', 'overview', 'tone', 'market tone', 'market summary', 'terminal', 'dashboard', 'selected', 'this auction',
+    // Monetary & Macro directly tied to Treasuries
+    'fomc', 'fed', 'federal reserve', 'quantitative tightening', 'qt', 'rate hike', 'rate cut', 'debt ceiling'
+  ];
+
+  return domainKeywords.some(kw => q.includes(kw));
+}
+
+export function getOffTopicRefusal() {
+  return `### 🏛️ Out of Scope Notice
+
+I am specialized exclusively as an institutional analyst for **U.S. Treasury Securities Auctions, Yield Curve Structure, and Fixed-Income Telemetry**.
+
+I strictly refrain from answering off-topic or general queries.
+
+Please ask a question related to the project topic:
+- **Treasury Benchmarks:** 2Y, 3Y, 5Y, 7Y, 10Y, 20Y, or 30Y auction results
+- **Auction Mechanics:** Bid-to-Cover (BTC), auction tails, stop vs. median dispersion, or allotment shares (Indirect, Direct, Primary Dealer)
+- **Yield Curve & Spreads:** 2s10s, 2s5s, 5s10s, 10s30s slope, term premium, and curve inversion
+- **Security Forensics:** Specific CUSIP lookup (e.g. \`91282CRX1\`) or the upcoming issuance calendar`;
 }

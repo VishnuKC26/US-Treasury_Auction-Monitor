@@ -1,5 +1,5 @@
 /**
- * client.js - Futures First Institutional US Treasury Monitor Terminal
+ * client.js - Institutional US Treasury Monitor Terminal
  * Vanilla ES Module orchestrating data loading, pure analytics, Chart.js,
  * theme management, responsive tab switching, and the AI Analyst Chatbot.
  */
@@ -156,13 +156,13 @@ export function switchTab(tabId) {
 }
 
 // =========================================================================
-// THEME MANAGEMENT (Futures First Light / Dark System)
+// THEME MANAGEMENT (Light / Dark System)
 // =========================================================================
 
 function initTheme() {
   let theme = 'light';
   try {
-    const saved = localStorage.getItem('ff-theme');
+    const saved = localStorage.getItem('treasury-theme') || localStorage.getItem('ff-theme');
     if (saved === 'light' || saved === 'dark') {
       theme = saved;
     } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -181,6 +181,7 @@ function toggleTheme() {
   state.theme = next;
   document.documentElement.setAttribute('data-theme', next);
   try {
+    localStorage.setItem('treasury-theme', next);
     localStorage.setItem('ff-theme', next);
   } catch (e) {}
   updateThemeUI();
@@ -350,10 +351,15 @@ function renderOverviewKPIs() {
   const dealerTagEl = document.getElementById('kpiDealerTag');
   const dealerSubEl = document.getElementById('kpiDealerSub');
 
-  if (stat10Y && stat10Y.shares) {
-    const dlrPct = stat10Y.shares.dealerPct;
-    if (dealerPctEl) dealerPctEl.textContent = dlrPct !== null ? `${dlrPct.toFixed(1)}%` : '—';
-    if (dealerTagEl) {
+  if (stat10Y) {
+    const shares = stat10Y.shares || {
+      indirectPct: stat10Y.indirectPct,
+      directPct: stat10Y.directPct,
+      dealerPct: stat10Y.dealerPct
+    };
+    const dlrPct = shares.dealerPct;
+    if (dealerPctEl) dealerPctEl.textContent = dlrPct !== null && dlrPct !== undefined ? `${dlrPct.toFixed(1)}%` : '—';
+    if (dealerTagEl && dlrPct !== null && dlrPct !== undefined) {
       if (dlrPct > 22) {
         dealerTagEl.className = 'kpi-tag soft';
         dealerTagEl.textContent = 'HIGH INDIGESTION';
@@ -365,8 +371,8 @@ function renderOverviewKPIs() {
         dealerTagEl.textContent = 'BALANCED';
       }
     }
-    if (dealerSubEl) {
-      dealerSubEl.textContent = `Indirect takedown: ${stat10Y.shares.indirectPct?.toFixed(1)}%`;
+    if (dealerSubEl && shares.indirectPct !== null && shares.indirectPct !== undefined) {
+      dealerSubEl.textContent = `Indirect takedown: ${shares.indirectPct.toFixed(1)}%`;
     }
   }
 
@@ -439,34 +445,66 @@ function renderFocusedTenorCard() {
   const stopVsMedEl = document.getElementById('focusStopVsMed');
   const allocHighEl = document.getElementById('focusAllocHigh');
   const askAiBtn = document.getElementById('btnAskAiTenor');
+  const summaryEl = document.getElementById('focusSummaryText');
 
-  if (codeEl) codeEl.textContent = `${stat.tenorCode} Benchmark Security`;
+  const isBond = stat.tenorCode === '20Y' || stat.tenorCode === '30Y';
+  if (codeEl) codeEl.textContent = `${stat.tenorCode} Benchmark ${isBond ? 'Bond' : 'Note'}`;
   if (issueEl) issueEl.textContent = stat.isReopening ? 'REOPENING' : 'NEW ISSUE';
   if (qualityEl) {
     qualityEl.className = `quality-badge ${stat.quality === 'STRONG' ? 'strong' : (stat.quality === 'SOFT' ? 'soft' : 'inline')}`;
-    qualityEl.textContent = `${stat.quality} (${stat.summary})`;
+    qualityEl.textContent = stat.quality;
+    qualityEl.title = stat.summary || `${stat.tenorCode} Auction Quality: ${stat.quality}`;
+  }
+  if (summaryEl) {
+    summaryEl.textContent = stat.summary || 'Auction telemetry updated.';
   }
   if (yieldEl) yieldEl.textContent = formatPct(stat.highYield);
   if (deltaEl) {
     deltaEl.textContent = formatBp(stat.deltaHighYieldBp);
     deltaEl.className = `focus-delta num ${stat.deltaHighYieldBp > 0 ? 'text-up' : (stat.deltaHighYieldBp < 0 ? 'text-down' : '')}`;
   }
+  const yieldSubEl = document.getElementById('focusYieldSub');
+  if (yieldSubEl) {
+    yieldSubEl.textContent = stat.priorHighYield !== null 
+      ? `Prior: ${formatPct(stat.priorHighYield)} (${formatBp(stat.deltaHighYieldBp)})` 
+      : 'Auction clearing rate';
+  }
   if (btcValEl) btcValEl.textContent = stat.bidToCover !== null ? `${stat.bidToCover.toFixed(2)}x` : '—';
   if (btcPctEl) {
     const pct = stat.btcPercentile !== null ? Math.round(stat.btcPercentile) : '—';
     btcPctEl.textContent = `${pct}th percentile vs norm (${stat.trailingMeanBtc?.toFixed(2)}x)`;
   }
-  if (takedownSumEl && stat.shares) {
-    takedownSumEl.textContent = `Ind: ${stat.shares.indirectPct?.toFixed(1)}% · Dir: ${stat.shares.directPct?.toFixed(1)}% · Dlr: ${stat.shares.dealerPct?.toFixed(1)}%`;
+
+  const shares = stat.shares || {
+    indirectPct: stat.indirectPct,
+    directPct: stat.directPct,
+    dealerPct: stat.dealerPct
+  };
+
+  if (takedownSumEl && shares) {
+    const ind = shares.indirectPct !== null && shares.indirectPct !== undefined ? `${shares.indirectPct.toFixed(1)}%` : '—';
+    const dir = shares.directPct !== null && shares.directPct !== undefined ? `${shares.directPct.toFixed(1)}%` : '—';
+    const dlr = shares.dealerPct !== null && shares.dealerPct !== undefined ? `${shares.dealerPct.toFixed(1)}%` : '—';
+    takedownSumEl.innerHTML = `
+      <div class="focus-takedown-headline">
+        <span class="focus-takedown-val num">${ind}</span>
+        <span class="focus-takedown-badge ind" title="Indirect Bidders (Foreign Central Banks & Mutual Funds)">Indirect</span>
+      </div>
+      <div class="focus-takedown-sub">
+        <span class="tk-sub dir" title="Direct Bidders (Domestic Accounts)"><span class="tk-dot dir"></span>Dir <b>${dir}</b></span>
+        <span class="tk-sep">·</span>
+        <span class="tk-sub dlr" title="Primary Dealers (Underwriter Absorption)"><span class="tk-dot dlr"></span>Dlr <b>${dlr}</b></span>
+      </div>
+    `;
   }
-  if (takedownBarEl && stat.shares) {
-    const ind = stat.shares.indirectPct || 0;
-    const dir = stat.shares.directPct || 0;
-    const dlr = stat.shares.dealerPct || 0;
+  if (takedownBarEl && shares) {
+    const ind = Math.max(0, shares.indirectPct || 0);
+    const dir = Math.max(0, shares.directPct || 0);
+    const dlr = Math.max(0, shares.dealerPct || 0);
     takedownBarEl.innerHTML = `
-      <div class="takedown-bar-seg indirect" style="width: ${ind}%;" title="Indirect ${ind.toFixed(1)}%"></div>
-      <div class="takedown-bar-seg direct" style="width: ${dir}%;" title="Direct ${dir.toFixed(1)}%"></div>
-      <div class="takedown-bar-seg dealer" style="width: ${dlr}%;" title="Primary Dealer ${dlr.toFixed(1)}%"></div>
+      <div class="takedown-bar-seg indirect" style="width: ${ind}%;" title="Indirect Bidders ${ind.toFixed(1)}%"></div>
+      <div class="takedown-bar-seg direct" style="width: ${dir}%;" title="Direct Bidders ${dir.toFixed(1)}%"></div>
+      <div class="takedown-bar-seg dealer" style="width: ${dlr}%;" title="Primary Dealers ${dlr.toFixed(1)}%"></div>
     `;
   }
   if (stopVsMedEl) stopVsMedEl.textContent = formatBp(stat.stopVsMedianBp);
@@ -921,7 +959,7 @@ function exportLedgerToCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `Futures_First_US_Treasury_Auctions_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `US_Treasury_Auctions_${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1059,6 +1097,7 @@ function setupEventListeners() {
       closeInspectorDrawer();
       chatbot.close();
       document.getElementById('apiGuideModal')?.classList.remove('is-open');
+      document.getElementById('groqKeyModal')?.classList.remove('is-open');
       document.getElementById('workspace-nav')?.classList.remove('mobile-open');
     }
   });

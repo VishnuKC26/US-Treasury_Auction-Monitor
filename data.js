@@ -18,7 +18,7 @@ const SAMPLE_AUCTIONS_URL = './data/sample_auctions.json';
 const SAMPLE_UPCOMING_URL = './data/upcoming_auctions.json';
 const WHEN_ISSUED_URL = './data/when_issued.json';
 
-const FETCH_TIMEOUT_MS = 9000;
+const FETCH_TIMEOUT_MS = 6000;
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();

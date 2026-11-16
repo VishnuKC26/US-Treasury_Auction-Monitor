@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>US Treasury Auctions Monitor // Futures First Institutional Telemetry</title>
+  <title>US Treasury Auctions Monitor // Institutional Telemetry Terminal</title>
   <meta name="description" content="Institutional US Treasury Securities Auction Monitor for nominal benchmarks (2Y, 3Y, 5Y, 7Y, 10Y, 20Y, 30Y). Real-time demand grading, allotment dynamics, yield curve spreads, and AI institutional analyst.">
   
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏛️</text></svg>">
@@ -14,12 +14,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="styles.css">
+  
+  <!-- KaTeX CSS for LaTeX Math Formatting -->
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
 
   <!-- Theme init before paint to prevent flash -->
   <script>
     (function() {
       try {
-        var t = localStorage.getItem('ff-theme');
+        var t = localStorage.getItem('treasury-theme') || localStorage.getItem('ff-theme');
         if (t !== 'light' && t !== 'dark') {
           t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
@@ -33,16 +36,16 @@
   <div class="hub-shell">
     
     <!-- =====================================================================
-         1. SIDEBAR NAVIGATION (Futures First Navy Theme)
+         1. SIDEBAR NAVIGATION
          ===================================================================== -->
     <nav id="workspace-nav" class="sidebar" aria-label="Workspace Navigation">
       <!-- Brand Header -->
       <div class="sidebar-header">
         <a href="#" class="brand-link" id="brandHomeLink">
-          <div class="brand-logo-mark">FF</div>
+          <div class="brand-logo-mark">UST</div>
           <div class="brand-titles">
-            <span class="brand-main">Futures First</span>
-            <span class="brand-sub">Treasury Monitor</span>
+            <span class="brand-main">Treasury Auctions</span>
+            <span class="brand-sub">Institutional Monitor</span>
           </div>
         </a>
       </div>
@@ -291,45 +294,72 @@
 
           <!-- Focused Benchmark Card -->
           <div class="focused-tenor-card" id="focusedTenorCard">
-            <div class="focus-col-main">
-              <div class="focus-tenor-label">
+            <!-- Top Header: Benchmark Tenor, Tags & AI Action -->
+            <div class="focus-card-header">
+              <div class="focus-header-meta">
                 <span class="focus-code" id="focusTenorCode">10Y Benchmark Note</span>
                 <span class="focus-issue-badge" id="focusIssueBadge">NEW ISSUE</span>
                 <span class="quality-badge inline" id="focusQualityBadge">IN LINE</span>
               </div>
-              <div class="focus-yield-row">
-                <span class="focus-yield-val num" id="focusHighYield">--%</span>
-                <span class="focus-delta num" id="focusDeltaYield">-- bp</span>
+              <div class="focus-header-action">
+                <button class="btn-ask-ai-card" id="btnAskAiTenor" data-ask-ai="Analyze the latest 10Y auction telemetry and demand shares in depth">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path></svg>
+                  Ask AI Analyst
+                </button>
               </div>
             </div>
 
-            <div class="focus-col">
-              <span class="focus-col-label">Bid-to-Cover</span>
-              <span class="focus-col-val num" id="focusBtcVal">--x</span>
-              <span class="focus-col-sub" id="focusBtcPct">-- percentile vs norm</span>
-            </div>
+            <!-- 4 Metrics Columns (Spacious, Zero-Overlap Grid) -->
+            <div class="focus-card-grid">
+              <div class="focus-col">
+                <span class="focus-col-label">High Clearing Yield</span>
+                <div class="focus-yield-row">
+                  <span class="focus-yield-val num" id="focusHighYield">--%</span>
+                  <span class="focus-delta num" id="focusDeltaYield">-- bp</span>
+                </div>
+                <span class="focus-col-sub" id="focusYieldSub">Auction clearing rate</span>
+              </div>
 
-            <div class="focus-col">
-              <span class="focus-col-label">Allotment Takedown</span>
-              <span class="focus-col-val num" id="focusTakedownSummary">Ind: --% · Dir: --% · Dlr: --%</span>
-              <div class="takedown-bar-stack" id="focusTakedownBar">
-                <div class="takedown-bar-seg indirect" style="width: 65%;"></div>
-                <div class="takedown-bar-seg direct" style="width: 20%;"></div>
-                <div class="takedown-bar-seg dealer" style="width: 15%;"></div>
+              <div class="focus-col">
+                <span class="focus-col-label">Bid-to-Cover</span>
+                <span class="focus-col-val num" id="focusBtcVal">--x</span>
+                <span class="focus-col-sub" id="focusBtcPct">-- percentile vs norm</span>
+              </div>
+
+              <div class="focus-col focus-col-takedown">
+                <span class="focus-col-label">Allotment Takedown</span>
+                <div class="focus-takedown-container" id="focusTakedownSummary">
+                  <div class="focus-takedown-headline">
+                    <span class="focus-takedown-val num" id="focusIndirectVal">--%</span>
+                    <span class="focus-takedown-badge ind">Indirect</span>
+                  </div>
+                  <div class="focus-takedown-sub">
+                    <span class="tk-sub dir"><span class="tk-dot dir"></span>Dir <b id="focusDirectVal">--%</b></span>
+                    <span class="tk-sep">·</span>
+                    <span class="tk-sub dlr"><span class="tk-dot dlr"></span>Dlr <b id="focusDealerVal">--%</b></span>
+                  </div>
+                </div>
+                <div class="takedown-bar-stack" id="focusTakedownBar">
+                  <div class="takedown-bar-seg indirect" style="width: 65%;"></div>
+                  <div class="takedown-bar-seg direct" style="width: 20%;"></div>
+                  <div class="takedown-bar-seg dealer" style="width: 15%;"></div>
+                </div>
+              </div>
+
+              <div class="focus-col">
+                <span class="focus-col-label">Dispersion & Tail</span>
+                <span class="focus-col-val num" id="focusStopVsMed">-- bp</span>
+                <span class="focus-col-sub" id="focusAllocHigh">--% alloc at high</span>
               </div>
             </div>
 
-            <div class="focus-col">
-              <span class="focus-col-label">Dispersion & Tail</span>
-              <span class="focus-col-val num" id="focusStopVsMed">-- bp</span>
-              <span class="focus-col-sub" id="focusAllocHigh">--% alloc at high</span>
-            </div>
-
-            <div class="focus-action">
-              <button class="btn-ask-ai-card" id="btnAskAiTenor" data-ask-ai="Analyze the latest 10Y auction telemetry and demand shares in depth">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path></svg>
-                Ask AI Analyst
-              </button>
+            <!-- Bottom Desk Take Commentary -->
+            <div class="focus-summary-row" id="focusSummaryRow">
+              <span class="focus-summary-pill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                Desk Take
+              </span>
+              <span class="focus-summary-text" id="focusSummaryText">Analyzing auction telemetry...</span>
             </div>
           </div>
         </section>
@@ -621,11 +651,19 @@
             <div class="chat-title-group">
               <div class="chat-bot-icon">AI</div>
               <div class="chat-title-text">
-                <span class="chat-title">Futures First Institutional Analyst</span>
+                <span class="chat-title">Institutional AI Analyst</span>
                 <span class="chat-subtitle">Directly connected to live Fiscal Data telemetry</span>
               </div>
             </div>
             <div class="chat-header-actions">
+              <div class="groq-pill" id="groqStatusPillStudio" title="Groq LPU Inference Status">
+                <span class="groq-dot active" id="groqDotStudio"></span>
+                <span class="groq-label" id="groqLabelStudio">Groq LPU: Active</span>
+              </div>
+              <button class="btn-groq-config" id="btnGroqConfigStudio" title="Configure Groq API Key (console.groq.com/keys)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1.5 1.5L16 7l-4 4-2-2-4 4 1.5 1.5-1.5 1.5L2 19l3 3 2.5-2.5 1.5 1.5 1.5-1.5 4-4-2-2 4-4 1.5 1.5L20 5l2-2z"></path></svg>
+                <span>Groq Key</span>
+              </button>
               <button class="btn-chat-tool" id="fullChatClearBtn" title="Clear Chat History">Clear Conversation</button>
             </div>
           </div>
@@ -674,6 +712,10 @@
         </div>
       </div>
       <div class="chat-header-actions">
+        <button class="btn-groq-config mini" id="btnGroqConfigFloat" title="Configure Groq API Key (console.groq.com/keys)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-1.5 1.5L16 7l-4 4-2-2-4 4 1.5 1.5-1.5 1.5L2 19l3 3 2.5-2.5 1.5 1.5 1.5-1.5 4-4-2-2 4-4 1.5 1.5L20 5l2-2z"></path></svg>
+          <span>Key</span>
+        </button>
         <button class="btn-chat-tool" id="chatClearBtn" title="Clear Chat History">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
@@ -800,7 +842,73 @@
   <div class="drawer-backdrop" id="inspectorBackdrop"></div>
 
   <!-- =========================================================================
-       5. API GUIDE MODAL
+       5. GROQ AI CONFIGURATION MODAL
+       ========================================================================= -->
+  <div class="modal-dialog" id="groqKeyModal" role="dialog" aria-modal="true" aria-labelledby="groqModalTitle">
+    <div class="modal-content groq-modal-content">
+      <div class="modal-header">
+        <div class="groq-modal-title-row">
+          <div class="groq-icon-badge">⚡</div>
+          <div>
+            <h3 class="modal-title" id="groqModalTitle">Groq AI Analyst Configuration</h3>
+            <span class="groq-modal-subtitle">Ultra-Fast Groq LPU™ Real-Time Macro & Treasury Inference</span>
+          </div>
+        </div>
+        <button class="btn-modal-close" id="btnGroqModalClose" aria-label="Close Groq configuration">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="groq-modal-intro">
+          The Treasury AI Analyst is powered by <strong>Groq LPU™ ultra-fast inference</strong>, delivering real-time institutional bond auction reasoning at 300+ tokens per second.
+        </p>
+
+        <div class="groq-link-banner">
+          <div class="glb-text">
+            <strong>Need a Groq API Key?</strong> Get your free key instantly from the official Groq Console:
+          </div>
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="btn-groq-external" id="linkGroqConsole">
+            <span>console.groq.com/keys</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </a>
+        </div>
+
+        <div class="groq-form-group">
+          <label for="inputGroqApiKey" class="groq-label-text">Groq API Key (starts with <code>gsk_...</code>):</label>
+          <div class="groq-input-wrap">
+            <input type="password" class="groq-input-field" id="inputGroqApiKey" placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn-toggle-eye" id="btnToggleGroqEye" title="Show or hide API key" aria-label="Show or hide API key">👁️</button>
+          </div>
+          <span class="groq-help-text">Stored securely in environment and local storage. Never shared publicly.</span>
+        </div>
+
+        <div class="groq-model-info-box">
+          <div class="gm-row">
+            <span class="gm-k">Inference Engine:</span>
+            <span class="gm-v"><strong>Groq LPU™ High-Speed Reasoning</strong> (<code>qwen/qwen3.8-27b</code>)</span>
+          </div>
+          <div class="gm-row">
+            <span class="gm-k">Context Injected:</span>
+            <span class="gm-v">Live Benchmark Tenors (2Y–30Y), Curve Spreads, 10Y CUSIP <code>91282CRX1</code>, and Upcoming Schedule</span>
+          </div>
+          <div class="gm-row">
+            <span class="gm-k">Offline Fallback:</span>
+            <span class="gm-v">Built-in Deterministic Institutional Rule Engine</span>
+          </div>
+        </div>
+
+        <div class="groq-test-feedback" id="groqTestFeedback" style="display: none;"></div>
+
+        <div class="groq-modal-actions">
+          <button class="btn-groq-save" id="btnSaveGroqKey">Save & Connect</button>
+          <button class="btn-groq-test" id="btnTestGroqKey">Test Key</button>
+          <button class="btn-groq-clear" id="btnClearGroqKey">Remove Key</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="groqModalBackdrop"></div>
+  </div>
+
+  <!-- =========================================================================
+       6. API GUIDE MODAL
        ========================================================================= -->
   <div class="modal-dialog" id="apiGuideModal" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
     <div class="modal-content">
@@ -833,6 +941,8 @@
 
   <!-- VENDOR LIBRARIES & APPLICATION MODULE -->
   <script src="vendor/chart.umd.min.js"></script>
+  <!-- KaTeX for Fast In-Browser LaTeX Math Typesetting -->
+  <script src="vendor/katex/katex.min.js"></script>
   <script type="module" src="client.js"></script>
 </body>
 </html>

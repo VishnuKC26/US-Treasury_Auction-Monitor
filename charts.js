@@ -1,17 +1,17 @@
 /**
  * charts.js - Institutional Chart Visualizations
- * Styled with Futures First Academy Design System Palette
+ * Styled with Institutional Design System Palette
  * Supports Light & Dark themes dynamically with Chart.js
  */
 
 import { state } from './state.js';
 import { calculateTakedownShares, getTenorCode } from './analytics.js';
 
-// Futures First Allotment Palette
+// Allotment Palette
 export const ALLOTMENT_COLORS = {
-  indirect: '#2f64ae', // Futures First Series 1 (Navy / Blue)
-  direct: '#13957f',   // Futures First Series 3 (Teal)
-  dealer: '#d27805'    // Futures First Series 2 (Amber / Orange)
+  indirect: '#2f64ae', // Series 1 (Navy / Blue)
+  direct: '#13957f',   // Series 3 (Teal)
+  dealer: '#d27805'    // Series 2 (Amber / Orange)
 };
 
 const FONT_SANS = "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
